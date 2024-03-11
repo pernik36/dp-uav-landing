@@ -1,0 +1,1175 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>MainWindow</class>
+ <widget class="QMainWindow" name="MainWindow">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>1166</width>
+    <height>602</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>MainWindow</string>
+  </property>
+  <widget class="QWidget" name="centralwidget">
+   <widget class="QTabWidget" name="tabWidget">
+    <property name="enabled">
+     <bool>true</bool>
+    </property>
+    <property name="geometry">
+     <rect>
+      <x>0</x>
+      <y>0</y>
+      <width>1161</width>
+      <height>541</height>
+     </rect>
+    </property>
+    <property name="currentIndex">
+     <number>0</number>
+    </property>
+    <property name="documentMode">
+     <bool>false</bool>
+    </property>
+    <property name="tabsClosable">
+     <bool>false</bool>
+    </property>
+    <property name="movable">
+     <bool>false</bool>
+    </property>
+    <property name="tabBarAutoHide">
+     <bool>false</bool>
+    </property>
+    <widget class="QWidget" name="tab_mise">
+     <attribute name="title">
+      <string>Mise</string>
+     </attribute>
+     <widget class="QWidget" name="widget" native="true">
+      <property name="geometry">
+       <rect>
+        <x>10</x>
+        <y>10</y>
+        <width>371</width>
+        <height>371</height>
+       </rect>
+      </property>
+      <property name="acceptDrops">
+       <bool>true</bool>
+      </property>
+      <property name="accessibleName">
+       <string>Mapa</string>
+      </property>
+      <property name="accessibleDescription">
+       <string>Mapa rozložení objektů v misi</string>
+      </property>
+      <property name="styleSheet">
+       <string notr="true">background: qconicalgradient(cx:0.5, cy:0.5, angle:0, stop:0 rgba(255, 255, 255, 255), stop:0.373979 rgba(255, 255, 255, 255), stop:0.373991 rgba(33, 30, 255, 255), stop:0.624018 rgba(33, 30, 255, 255), stop:0.624043 rgba(255, 0, 0, 255), stop:1 rgba(255, 0, 0, 255))</string>
+      </property>
+      <widget class="QLabel" name="label_uav">
+       <property name="geometry">
+        <rect>
+         <x>60</x>
+         <y>100</y>
+         <width>67</width>
+         <height>17</height>
+        </rect>
+       </property>
+       <property name="autoFillBackground">
+        <bool>false</bool>
+       </property>
+       <property name="styleSheet">
+        <string notr="true"/>
+       </property>
+       <property name="text">
+        <string>letadlo</string>
+       </property>
+      </widget>
+      <widget class="QLabel" name="label_tag">
+       <property name="geometry">
+        <rect>
+         <x>280</x>
+         <y>190</y>
+         <width>67</width>
+         <height>17</height>
+        </rect>
+       </property>
+       <property name="text">
+        <string>plošina</string>
+       </property>
+       <property name="buddy">
+        <cstring>pl_x</cstring>
+       </property>
+      </widget>
+     </widget>
+     <widget class="QGroupBox" name="groupBox">
+      <property name="geometry">
+       <rect>
+        <x>400</x>
+        <y>10</y>
+        <width>331</width>
+        <height>71</height>
+       </rect>
+      </property>
+      <property name="title">
+       <string>Poloha plošiny</string>
+      </property>
+      <widget class="QDoubleSpinBox" name="pl_x">
+       <property name="geometry">
+        <rect>
+         <x>30</x>
+         <y>30</y>
+         <width>71</width>
+         <height>26</height>
+        </rect>
+       </property>
+       <property name="whatsThis">
+        <string>Poloha plošiny na ose X vzhledem k počátku souřadnic světa.</string>
+       </property>
+       <property name="accessibleName">
+        <string>X</string>
+       </property>
+       <property name="wrapping">
+        <bool>true</bool>
+       </property>
+       <property name="showGroupSeparator" stdset="0">
+        <bool>false</bool>
+       </property>
+       <property name="suffix">
+        <string> m</string>
+       </property>
+       <property name="decimals">
+        <number>1</number>
+       </property>
+       <property name="minimum">
+        <double>-25.000000000000000</double>
+       </property>
+       <property name="maximum">
+        <double>25.000000000000000</double>
+       </property>
+       <property name="singleStep">
+        <double>0.100000000000000</double>
+       </property>
+       <property name="stepType">
+        <enum>QAbstractSpinBox::AdaptiveDecimalStepType</enum>
+       </property>
+       <property name="value">
+        <double>23.000000000000000</double>
+       </property>
+      </widget>
+      <widget class="QLabel" name="label">
+       <property name="geometry">
+        <rect>
+         <x>10</x>
+         <y>31</y>
+         <width>21</width>
+         <height>20</height>
+        </rect>
+       </property>
+       <property name="text">
+        <string>X:</string>
+       </property>
+       <property name="alignment">
+        <set>Qt::AlignBottom|Qt::AlignLeading|Qt::AlignLeft</set>
+       </property>
+       <property name="buddy">
+        <cstring>pl_x</cstring>
+       </property>
+      </widget>
+      <widget class="QLabel" name="label_2">
+       <property name="geometry">
+        <rect>
+         <x>120</x>
+         <y>30</y>
+         <width>21</width>
+         <height>20</height>
+        </rect>
+       </property>
+       <property name="text">
+        <string>Y:</string>
+       </property>
+       <property name="alignment">
+        <set>Qt::AlignBottom|Qt::AlignLeading|Qt::AlignLeft</set>
+       </property>
+       <property name="buddy">
+        <cstring>pl_y</cstring>
+       </property>
+      </widget>
+      <widget class="QDoubleSpinBox" name="pl_y">
+       <property name="geometry">
+        <rect>
+         <x>140</x>
+         <y>29</y>
+         <width>71</width>
+         <height>26</height>
+        </rect>
+       </property>
+       <property name="whatsThis">
+        <string>Poloha plošiny na ose X vzhledem k počátku souřadnic světa.</string>
+       </property>
+       <property name="accessibleName">
+        <string>X</string>
+       </property>
+       <property name="wrapping">
+        <bool>true</bool>
+       </property>
+       <property name="showGroupSeparator" stdset="0">
+        <bool>false</bool>
+       </property>
+       <property name="suffix">
+        <string> m</string>
+       </property>
+       <property name="decimals">
+        <number>1</number>
+       </property>
+       <property name="minimum">
+        <double>-25.000000000000000</double>
+       </property>
+       <property name="maximum">
+        <double>25.000000000000000</double>
+       </property>
+       <property name="singleStep">
+        <double>0.100000000000000</double>
+       </property>
+       <property name="stepType">
+        <enum>QAbstractSpinBox::AdaptiveDecimalStepType</enum>
+       </property>
+       <property name="value">
+        <double>-11.199999999999999</double>
+       </property>
+      </widget>
+      <widget class="QDoubleSpinBox" name="pl_phi">
+       <property name="enabled">
+        <bool>false</bool>
+       </property>
+       <property name="geometry">
+        <rect>
+         <x>250</x>
+         <y>29</y>
+         <width>71</width>
+         <height>26</height>
+        </rect>
+       </property>
+       <property name="whatsThis">
+        <string>Poloha plošiny na ose X vzhledem k počátku souřadnic světa.</string>
+       </property>
+       <property name="accessibleName">
+        <string>phi</string>
+       </property>
+       <property name="wrapping">
+        <bool>true</bool>
+       </property>
+       <property name="showGroupSeparator" stdset="0">
+        <bool>false</bool>
+       </property>
+       <property name="suffix">
+        <string> ˚</string>
+       </property>
+       <property name="decimals">
+        <number>0</number>
+       </property>
+       <property name="minimum">
+        <double>0.000000000000000</double>
+       </property>
+       <property name="maximum">
+        <double>359.000000000000000</double>
+       </property>
+       <property name="singleStep">
+        <double>1.000000000000000</double>
+       </property>
+       <property name="stepType">
+        <enum>QAbstractSpinBox::DefaultStepType</enum>
+       </property>
+       <property name="value">
+        <double>0.000000000000000</double>
+       </property>
+      </widget>
+      <widget class="QLabel" name="label_3">
+       <property name="enabled">
+        <bool>false</bool>
+       </property>
+       <property name="geometry">
+        <rect>
+         <x>230</x>
+         <y>30</y>
+         <width>21</width>
+         <height>20</height>
+        </rect>
+       </property>
+       <property name="text">
+        <string>φ:</string>
+       </property>
+       <property name="alignment">
+        <set>Qt::AlignBottom|Qt::AlignLeading|Qt::AlignLeft</set>
+       </property>
+       <property name="buddy">
+        <cstring>pl_phi</cstring>
+       </property>
+      </widget>
+     </widget>
+     <widget class="QGroupBox" name="groupBox_2">
+      <property name="geometry">
+       <rect>
+        <x>400</x>
+        <y>90</y>
+        <width>331</width>
+        <height>71</height>
+       </rect>
+      </property>
+      <property name="title">
+       <string>Poloha letadla</string>
+      </property>
+      <widget class="QDoubleSpinBox" name="uav_x">
+       <property name="geometry">
+        <rect>
+         <x>30</x>
+         <y>30</y>
+         <width>71</width>
+         <height>26</height>
+        </rect>
+       </property>
+       <property name="whatsThis">
+        <string>Poloha plošiny na ose X vzhledem k počátku souřadnic světa.</string>
+       </property>
+       <property name="accessibleName">
+        <string>X</string>
+       </property>
+       <property name="wrapping">
+        <bool>true</bool>
+       </property>
+       <property name="showGroupSeparator" stdset="0">
+        <bool>false</bool>
+       </property>
+       <property name="suffix">
+        <string> m</string>
+       </property>
+       <property name="decimals">
+        <number>1</number>
+       </property>
+       <property name="minimum">
+        <double>-25.000000000000000</double>
+       </property>
+       <property name="maximum">
+        <double>25.000000000000000</double>
+       </property>
+       <property name="singleStep">
+        <double>0.100000000000000</double>
+       </property>
+       <property name="stepType">
+        <enum>QAbstractSpinBox::AdaptiveDecimalStepType</enum>
+       </property>
+       <property name="value">
+        <double>-5.000000000000000</double>
+       </property>
+      </widget>
+      <widget class="QLabel" name="label_4">
+       <property name="geometry">
+        <rect>
+         <x>10</x>
+         <y>31</y>
+         <width>21</width>
+         <height>20</height>
+        </rect>
+       </property>
+       <property name="text">
+        <string>X:</string>
+       </property>
+       <property name="alignment">
+        <set>Qt::AlignBottom|Qt::AlignLeading|Qt::AlignLeft</set>
+       </property>
+       <property name="buddy">
+        <cstring>uav_x</cstring>
+       </property>
+      </widget>
+      <widget class="QLabel" name="label_5">
+       <property name="geometry">
+        <rect>
+         <x>120</x>
+         <y>30</y>
+         <width>21</width>
+         <height>20</height>
+        </rect>
+       </property>
+       <property name="text">
+        <string>Y:</string>
+       </property>
+       <property name="alignment">
+        <set>Qt::AlignBottom|Qt::AlignLeading|Qt::AlignLeft</set>
+       </property>
+       <property name="buddy">
+        <cstring>uav_y</cstring>
+       </property>
+      </widget>
+      <widget class="QDoubleSpinBox" name="uav_y">
+       <property name="geometry">
+        <rect>
+         <x>140</x>
+         <y>29</y>
+         <width>71</width>
+         <height>26</height>
+        </rect>
+       </property>
+       <property name="whatsThis">
+        <string>Poloha plošiny na ose X vzhledem k počátku souřadnic světa.</string>
+       </property>
+       <property name="accessibleName">
+        <string>X</string>
+       </property>
+       <property name="wrapping">
+        <bool>true</bool>
+       </property>
+       <property name="showGroupSeparator" stdset="0">
+        <bool>false</bool>
+       </property>
+       <property name="suffix">
+        <string> m</string>
+       </property>
+       <property name="decimals">
+        <number>1</number>
+       </property>
+       <property name="minimum">
+        <double>-25.000000000000000</double>
+       </property>
+       <property name="maximum">
+        <double>25.000000000000000</double>
+       </property>
+       <property name="singleStep">
+        <double>0.100000000000000</double>
+       </property>
+       <property name="stepType">
+        <enum>QAbstractSpinBox::AdaptiveDecimalStepType</enum>
+       </property>
+       <property name="value">
+        <double>3.000000000000000</double>
+       </property>
+      </widget>
+      <widget class="QDoubleSpinBox" name="uav_phi">
+       <property name="enabled">
+        <bool>false</bool>
+       </property>
+       <property name="geometry">
+        <rect>
+         <x>250</x>
+         <y>29</y>
+         <width>71</width>
+         <height>26</height>
+        </rect>
+       </property>
+       <property name="whatsThis">
+        <string>Poloha plošiny na ose X vzhledem k počátku souřadnic světa.</string>
+       </property>
+       <property name="accessibleName">
+        <string>phi</string>
+       </property>
+       <property name="wrapping">
+        <bool>true</bool>
+       </property>
+       <property name="showGroupSeparator" stdset="0">
+        <bool>false</bool>
+       </property>
+       <property name="suffix">
+        <string> ˚</string>
+       </property>
+       <property name="decimals">
+        <number>0</number>
+       </property>
+       <property name="minimum">
+        <double>0.000000000000000</double>
+       </property>
+       <property name="maximum">
+        <double>359.000000000000000</double>
+       </property>
+       <property name="singleStep">
+        <double>1.000000000000000</double>
+       </property>
+       <property name="stepType">
+        <enum>QAbstractSpinBox::DefaultStepType</enum>
+       </property>
+       <property name="value">
+        <double>0.000000000000000</double>
+       </property>
+      </widget>
+      <widget class="QLabel" name="label_6">
+       <property name="enabled">
+        <bool>false</bool>
+       </property>
+       <property name="geometry">
+        <rect>
+         <x>230</x>
+         <y>30</y>
+         <width>21</width>
+         <height>20</height>
+        </rect>
+       </property>
+       <property name="text">
+        <string>φ:</string>
+       </property>
+       <property name="alignment">
+        <set>Qt::AlignBottom|Qt::AlignLeading|Qt::AlignLeft</set>
+       </property>
+       <property name="buddy">
+        <cstring>uav_phi</cstring>
+       </property>
+      </widget>
+     </widget>
+     <widget class="QGroupBox" name="groupBox_3">
+      <property name="geometry">
+       <rect>
+        <x>400</x>
+        <y>170</y>
+        <width>241</width>
+        <height>101</height>
+       </rect>
+      </property>
+      <property name="title">
+       <string>Vítr</string>
+      </property>
+      <widget class="QDoubleSpinBox" name="vitr_v">
+       <property name="geometry">
+        <rect>
+         <x>40</x>
+         <y>30</y>
+         <width>81</width>
+         <height>26</height>
+        </rect>
+       </property>
+       <property name="whatsThis">
+        <string>Poloha plošiny na ose X vzhledem k počátku souřadnic světa.</string>
+       </property>
+       <property name="accessibleName">
+        <string>X</string>
+       </property>
+       <property name="wrapping">
+        <bool>true</bool>
+       </property>
+       <property name="showGroupSeparator" stdset="0">
+        <bool>false</bool>
+       </property>
+       <property name="suffix">
+        <string> m/s</string>
+       </property>
+       <property name="decimals">
+        <number>1</number>
+       </property>
+       <property name="minimum">
+        <double>0.000000000000000</double>
+       </property>
+       <property name="maximum">
+        <double>30.000000000000000</double>
+       </property>
+       <property name="singleStep">
+        <double>0.100000000000000</double>
+       </property>
+       <property name="stepType">
+        <enum>QAbstractSpinBox::AdaptiveDecimalStepType</enum>
+       </property>
+       <property name="value">
+        <double>22.000000000000000</double>
+       </property>
+      </widget>
+      <widget class="QLabel" name="label_7">
+       <property name="geometry">
+        <rect>
+         <x>20</x>
+         <y>31</y>
+         <width>21</width>
+         <height>20</height>
+        </rect>
+       </property>
+       <property name="text">
+        <string>v:</string>
+       </property>
+       <property name="alignment">
+        <set>Qt::AlignBottom|Qt::AlignLeading|Qt::AlignLeft</set>
+       </property>
+       <property name="buddy">
+        <cstring>vitr_v</cstring>
+       </property>
+      </widget>
+      <widget class="QLabel" name="label_8">
+       <property name="geometry">
+        <rect>
+         <x>10</x>
+         <y>61</y>
+         <width>21</width>
+         <height>20</height>
+        </rect>
+       </property>
+       <property name="text">
+        <string>σ&lt;sub&gt;v&lt;/sub&gt;:</string>
+       </property>
+       <property name="alignment">
+        <set>Qt::AlignBottom|Qt::AlignRight|Qt::AlignTrailing</set>
+       </property>
+       <property name="buddy">
+        <cstring>vitr_s_v</cstring>
+       </property>
+      </widget>
+      <widget class="QDoubleSpinBox" name="vitr_s_v">
+       <property name="geometry">
+        <rect>
+         <x>40</x>
+         <y>60</y>
+         <width>81</width>
+         <height>26</height>
+        </rect>
+       </property>
+       <property name="whatsThis">
+        <string>Poloha plošiny na ose X vzhledem k počátku souřadnic světa.</string>
+       </property>
+       <property name="accessibleName">
+        <string>X</string>
+       </property>
+       <property name="wrapping">
+        <bool>true</bool>
+       </property>
+       <property name="showGroupSeparator" stdset="0">
+        <bool>false</bool>
+       </property>
+       <property name="suffix">
+        <string> m/s</string>
+       </property>
+       <property name="decimals">
+        <number>1</number>
+       </property>
+       <property name="minimum">
+        <double>0.000000000000000</double>
+       </property>
+       <property name="maximum">
+        <double>25.000000000000000</double>
+       </property>
+       <property name="singleStep">
+        <double>0.100000000000000</double>
+       </property>
+       <property name="stepType">
+        <enum>QAbstractSpinBox::AdaptiveDecimalStepType</enum>
+       </property>
+       <property name="value">
+        <double>22.000000000000000</double>
+       </property>
+      </widget>
+      <widget class="QDoubleSpinBox" name="vitr_phi">
+       <property name="geometry">
+        <rect>
+         <x>160</x>
+         <y>29</y>
+         <width>71</width>
+         <height>26</height>
+        </rect>
+       </property>
+       <property name="whatsThis">
+        <string>Poloha plošiny na ose X vzhledem k počátku souřadnic světa.</string>
+       </property>
+       <property name="accessibleName">
+        <string>phi</string>
+       </property>
+       <property name="wrapping">
+        <bool>true</bool>
+       </property>
+       <property name="showGroupSeparator" stdset="0">
+        <bool>false</bool>
+       </property>
+       <property name="suffix">
+        <string> ˚</string>
+       </property>
+       <property name="decimals">
+        <number>0</number>
+       </property>
+       <property name="minimum">
+        <double>0.000000000000000</double>
+       </property>
+       <property name="maximum">
+        <double>359.000000000000000</double>
+       </property>
+       <property name="singleStep">
+        <double>1.000000000000000</double>
+       </property>
+       <property name="stepType">
+        <enum>QAbstractSpinBox::DefaultStepType</enum>
+       </property>
+       <property name="value">
+        <double>0.000000000000000</double>
+       </property>
+      </widget>
+      <widget class="QLabel" name="label_9">
+       <property name="geometry">
+        <rect>
+         <x>130</x>
+         <y>30</y>
+         <width>21</width>
+         <height>20</height>
+        </rect>
+       </property>
+       <property name="text">
+        <string>φ:</string>
+       </property>
+       <property name="alignment">
+        <set>Qt::AlignBottom|Qt::AlignRight|Qt::AlignTrailing</set>
+       </property>
+       <property name="buddy">
+        <cstring>vitr_phi</cstring>
+       </property>
+      </widget>
+      <widget class="QDoubleSpinBox" name="vitr_s_phi">
+       <property name="geometry">
+        <rect>
+         <x>160</x>
+         <y>60</y>
+         <width>71</width>
+         <height>26</height>
+        </rect>
+       </property>
+       <property name="whatsThis">
+        <string>Poloha plošiny na ose X vzhledem k počátku souřadnic světa.</string>
+       </property>
+       <property name="accessibleName">
+        <string>phi</string>
+       </property>
+       <property name="wrapping">
+        <bool>true</bool>
+       </property>
+       <property name="showGroupSeparator" stdset="0">
+        <bool>false</bool>
+       </property>
+       <property name="suffix">
+        <string> ˚</string>
+       </property>
+       <property name="decimals">
+        <number>0</number>
+       </property>
+       <property name="minimum">
+        <double>0.000000000000000</double>
+       </property>
+       <property name="maximum">
+        <double>359.000000000000000</double>
+       </property>
+       <property name="singleStep">
+        <double>1.000000000000000</double>
+       </property>
+       <property name="stepType">
+        <enum>QAbstractSpinBox::DefaultStepType</enum>
+       </property>
+       <property name="value">
+        <double>0.000000000000000</double>
+       </property>
+      </widget>
+      <widget class="QLabel" name="label_10">
+       <property name="geometry">
+        <rect>
+         <x>130</x>
+         <y>61</y>
+         <width>21</width>
+         <height>20</height>
+        </rect>
+       </property>
+       <property name="text">
+        <string>σ&lt;sub&gt;φ&lt;/sub&gt;:</string>
+       </property>
+       <property name="alignment">
+        <set>Qt::AlignBottom|Qt::AlignRight|Qt::AlignTrailing</set>
+       </property>
+       <property name="buddy">
+        <cstring>vitr_s_phi</cstring>
+       </property>
+      </widget>
+     </widget>
+     <widget class="QGroupBox" name="groupBox_4">
+      <property name="geometry">
+       <rect>
+        <x>400</x>
+        <y>280</y>
+        <width>331</width>
+        <height>101</height>
+       </rect>
+      </property>
+      <property name="title">
+       <string>Plošina</string>
+      </property>
+      <widget class="QDoubleSpinBox" name="pl_a">
+       <property name="geometry">
+        <rect>
+         <x>70</x>
+         <y>30</y>
+         <width>81</width>
+         <height>26</height>
+        </rect>
+       </property>
+       <property name="whatsThis">
+        <string>Poloha plošiny na ose X vzhledem k počátku souřadnic světa.</string>
+       </property>
+       <property name="accessibleName">
+        <string>X</string>
+       </property>
+       <property name="wrapping">
+        <bool>true</bool>
+       </property>
+       <property name="showGroupSeparator" stdset="0">
+        <bool>false</bool>
+       </property>
+       <property name="suffix">
+        <string> cm</string>
+       </property>
+       <property name="decimals">
+        <number>0</number>
+       </property>
+       <property name="minimum">
+        <double>10.000000000000000</double>
+       </property>
+       <property name="maximum">
+        <double>200.000000000000000</double>
+       </property>
+       <property name="singleStep">
+        <double>1.000000000000000</double>
+       </property>
+       <property name="stepType">
+        <enum>QAbstractSpinBox::AdaptiveDecimalStepType</enum>
+       </property>
+       <property name="value">
+        <double>200.000000000000000</double>
+       </property>
+      </widget>
+      <widget class="QLabel" name="label_11">
+       <property name="geometry">
+        <rect>
+         <x>10</x>
+         <y>31</y>
+         <width>51</width>
+         <height>20</height>
+        </rect>
+       </property>
+       <property name="text">
+        <string>strana:</string>
+       </property>
+       <property name="alignment">
+        <set>Qt::AlignBottom|Qt::AlignRight|Qt::AlignTrailing</set>
+       </property>
+       <property name="buddy">
+        <cstring>pl_a</cstring>
+       </property>
+      </widget>
+      <widget class="QLabel" name="label_12">
+       <property name="geometry">
+        <rect>
+         <x>170</x>
+         <y>31</y>
+         <width>71</width>
+         <height>20</height>
+        </rect>
+       </property>
+       <property name="text">
+        <string>zastínění:</string>
+       </property>
+       <property name="alignment">
+        <set>Qt::AlignBottom|Qt::AlignRight|Qt::AlignTrailing</set>
+       </property>
+       <property name="buddy">
+        <cstring>pl_stin</cstring>
+       </property>
+      </widget>
+      <widget class="QDoubleSpinBox" name="pl_stin">
+       <property name="geometry">
+        <rect>
+         <x>250</x>
+         <y>30</y>
+         <width>71</width>
+         <height>26</height>
+        </rect>
+       </property>
+       <property name="whatsThis">
+        <string>Poloha plošiny na ose X vzhledem k počátku souřadnic světa.</string>
+       </property>
+       <property name="accessibleName">
+        <string>X</string>
+       </property>
+       <property name="wrapping">
+        <bool>true</bool>
+       </property>
+       <property name="showGroupSeparator" stdset="0">
+        <bool>false</bool>
+       </property>
+       <property name="suffix">
+        <string> %</string>
+       </property>
+       <property name="decimals">
+        <number>0</number>
+       </property>
+       <property name="minimum">
+        <double>0.000000000000000</double>
+       </property>
+       <property name="maximum">
+        <double>100.000000000000000</double>
+       </property>
+       <property name="singleStep">
+        <double>1.000000000000000</double>
+       </property>
+       <property name="stepType">
+        <enum>QAbstractSpinBox::AdaptiveDecimalStepType</enum>
+       </property>
+       <property name="value">
+        <double>3.000000000000000</double>
+       </property>
+      </widget>
+      <widget class="QDoubleSpinBox" name="pl_stin_sklon">
+       <property name="geometry">
+        <rect>
+         <x>250</x>
+         <y>60</y>
+         <width>71</width>
+         <height>26</height>
+        </rect>
+       </property>
+       <property name="whatsThis">
+        <string>Poloha plošiny na ose X vzhledem k počátku souřadnic světa.</string>
+       </property>
+       <property name="accessibleName">
+        <string>phi</string>
+       </property>
+       <property name="wrapping">
+        <bool>true</bool>
+       </property>
+       <property name="showGroupSeparator" stdset="0">
+        <bool>false</bool>
+       </property>
+       <property name="suffix">
+        <string> ˚</string>
+       </property>
+       <property name="decimals">
+        <number>0</number>
+       </property>
+       <property name="minimum">
+        <double>0.000000000000000</double>
+       </property>
+       <property name="maximum">
+        <double>359.000000000000000</double>
+       </property>
+       <property name="singleStep">
+        <double>1.000000000000000</double>
+       </property>
+       <property name="stepType">
+        <enum>QAbstractSpinBox::DefaultStepType</enum>
+       </property>
+       <property name="value">
+        <double>0.000000000000000</double>
+       </property>
+      </widget>
+      <widget class="QLabel" name="label_13">
+       <property name="geometry">
+        <rect>
+         <x>160</x>
+         <y>60</y>
+         <width>81</width>
+         <height>20</height>
+        </rect>
+       </property>
+       <property name="text">
+        <string>sklon stínu:</string>
+       </property>
+       <property name="alignment">
+        <set>Qt::AlignBottom|Qt::AlignRight|Qt::AlignTrailing</set>
+       </property>
+       <property name="buddy">
+        <cstring>pl_stin_sklon</cstring>
+       </property>
+      </widget>
+     </widget>
+     <widget class="QListView" name="list_mise">
+      <property name="geometry">
+       <rect>
+        <x>750</x>
+        <y>100</y>
+        <width>391</width>
+        <height>281</height>
+       </rect>
+      </property>
+     </widget>
+     <widget class="QPlainTextEdit" name="textBox_nazev_mise">
+      <property name="geometry">
+       <rect>
+        <x>810</x>
+        <y>20</y>
+        <width>331</width>
+        <height>31</height>
+       </rect>
+      </property>
+      <property name="tabChangesFocus">
+       <bool>true</bool>
+      </property>
+      <property name="lineWrapMode">
+       <enum>QPlainTextEdit::NoWrap</enum>
+      </property>
+      <property name="placeholderText">
+       <string>Název mise</string>
+      </property>
+     </widget>
+     <widget class="QLabel" name="label_14">
+      <property name="geometry">
+       <rect>
+        <x>750</x>
+        <y>26</y>
+        <width>51</width>
+        <height>21</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>Název:</string>
+      </property>
+      <property name="alignment">
+       <set>Qt::AlignRight|Qt::AlignTop|Qt::AlignTrailing</set>
+      </property>
+      <property name="buddy">
+       <cstring>textBox_nazev_mise</cstring>
+      </property>
+     </widget>
+     <widget class="QPushButton" name="but_save">
+      <property name="geometry">
+       <rect>
+        <x>850</x>
+        <y>60</y>
+        <width>89</width>
+        <height>25</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>Uložit</string>
+      </property>
+     </widget>
+     <widget class="QPushButton" name="but_load">
+      <property name="geometry">
+       <rect>
+        <x>950</x>
+        <y>60</y>
+        <width>89</width>
+        <height>25</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>Načíst</string>
+      </property>
+     </widget>
+     <widget class="QPushButton" name="but_delete">
+      <property name="geometry">
+       <rect>
+        <x>1050</x>
+        <y>60</y>
+        <width>89</width>
+        <height>25</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>Odstranit</string>
+      </property>
+     </widget>
+     <widget class="QPushButton" name="but_start">
+      <property name="geometry">
+       <rect>
+        <x>750</x>
+        <y>60</y>
+        <width>71</width>
+        <height>25</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>▶ Start</string>
+      </property>
+     </widget>
+     <widget class="QLabel" name="label_15">
+      <property name="geometry">
+       <rect>
+        <x>650</x>
+        <y>190</y>
+        <width>81</width>
+        <height>81</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>Preview</string>
+      </property>
+      <property name="alignment">
+       <set>Qt::AlignCenter</set>
+      </property>
+     </widget>
+     <widget class="QComboBox" name="comboBox_alg">
+      <property name="geometry">
+       <rect>
+        <x>490</x>
+        <y>400</y>
+        <width>241</width>
+        <height>25</height>
+       </rect>
+      </property>
+      <item>
+       <property name="text">
+        <string>Základní</string>
+       </property>
+      </item>
+     </widget>
+     <widget class="QLabel" name="label_16">
+      <property name="geometry">
+       <rect>
+        <x>400</x>
+        <y>400</y>
+        <width>81</width>
+        <height>20</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>Algoritmus:</string>
+      </property>
+      <property name="alignment">
+       <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+      </property>
+      <property name="buddy">
+       <cstring>comboBox_alg</cstring>
+      </property>
+     </widget>
+    </widget>
+    <widget class="QWidget" name="tab_zive">
+     <attribute name="title">
+      <string>Živě</string>
+     </attribute>
+    </widget>
+    <widget class="QWidget" name="tab_experiment">
+     <attribute name="title">
+      <string>Experiment</string>
+     </attribute>
+    </widget>
+   </widget>
+  </widget>
+  <widget class="QMenuBar" name="menubar">
+   <property name="geometry">
+    <rect>
+     <x>0</x>
+     <y>0</y>
+     <width>1166</width>
+     <height>22</height>
+    </rect>
+   </property>
+  </widget>
+  <widget class="QStatusBar" name="statusbar"/>
+ </widget>
+ <tabstops>
+  <tabstop>tabWidget</tabstop>
+  <tabstop>pl_x</tabstop>
+  <tabstop>pl_y</tabstop>
+  <tabstop>pl_phi</tabstop>
+  <tabstop>uav_x</tabstop>
+  <tabstop>uav_y</tabstop>
+  <tabstop>uav_phi</tabstop>
+  <tabstop>vitr_v</tabstop>
+  <tabstop>vitr_phi</tabstop>
+  <tabstop>vitr_s_v</tabstop>
+  <tabstop>vitr_s_phi</tabstop>
+  <tabstop>pl_a</tabstop>
+  <tabstop>pl_stin</tabstop>
+  <tabstop>pl_stin_sklon</tabstop>
+  <tabstop>comboBox_alg</tabstop>
+  <tabstop>textBox_nazev_mise</tabstop>
+  <tabstop>but_save</tabstop>
+  <tabstop>list_mise</tabstop>
+  <tabstop>but_load</tabstop>
+  <tabstop>but_delete</tabstop>
+  <tabstop>but_start</tabstop>
+ </tabstops>
+ <resources/>
+ <connections/>
+</ui>
