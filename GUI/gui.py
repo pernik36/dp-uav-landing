@@ -10,6 +10,9 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QWidget
 import psutil
 
+from qasync import QEventLoop, QApplication, asyncClose, asyncSlot
+import asyncio
+
 from missions import Ui_MainWindow
 import yaml
 
@@ -256,6 +259,14 @@ class Missions(qtw.QMainWindow):
         world.set("name", mission["nazev"])
 
         tree.write(os.path.join(self.cfg["gz_worlds_dir"], output_file))
+
+    @asyncClose
+    async def closeEvent(self, event):
+        pass
+
+    @asyncSlot()
+    async def onMyEvent(self):
+        pass
     
 class MissionsModel(qtc.QAbstractListModel):
     def __init__(self, missionList=None):
@@ -311,9 +322,16 @@ class MissionsModel(qtc.QAbstractListModel):
         
 
 if __name__ == "__main__":
-    app = qtw.QApplication(sys.argv)
+    app = QApplication(sys.argv)
+
+    event_loop = QEventLoop(app)
+    asyncio.set_event_loop(event_loop)
+
+    app_close_event = asyncio.Event()
+    app.aboutToQuit.connect(app_close_event.set)
 
     window = Missions()
     window.show()
 
-    sys.exit(app.exec())
+    with event_loop:
+        event_loop.run_until_complete(app_close_event.wait())
