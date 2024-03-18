@@ -13,6 +13,7 @@ import psutil
 from qasync import QEventLoop, QApplication, asyncClose, asyncSlot
 import asyncio
 
+from landingAlgs import AlgsModel
 from missions import Ui_MainWindow
 import yaml
 
@@ -90,6 +91,8 @@ class Missions(qtw.QMainWindow):
         self.mise = MissionsModel()                            # dict of missions, mission name as key
         self.ui.list_mise.setModel(self.mise)
         self.px4 = None
+        self.algs = AlgsModel()
+        self.ui.comboBox_alg.setModel(self.algs)
 
     def save_mission(self):
         nazev = self.ui.textBox_nazev_mise.toPlainText()
@@ -209,6 +212,8 @@ class Missions(qtw.QMainWindow):
 
         os.environ.clear()
         os.environ.update(original_env)
+
+        qtc.QTimer.singleShot(15000, self.algs.list[0].run)
 
     def run_stop_mission(self):
         if self.px4 is None:
