@@ -1,5 +1,10 @@
 gz_worlds_dir: /home/vojta/PX4/PX4-Autopilot/Tools/simulation/gz/worlds
-base_world_path: ./base.sdf
+base_world_path: ./GUI/base.sdf
 px4_bin_path: "/home/vojta/PX4/PX4-Autopilot/build/px4_sitl_default/bin/px4"
 gz_model: x500_cam
 px4_sys_autostart: '4001'
+camera:
+  fx: 614.1182502063649
+  fy: 614.2811984891936
+  cx: 289.5307050411072
+  cy: 239.48850240020735

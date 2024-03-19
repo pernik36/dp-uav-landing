@@ -17,6 +17,8 @@ from landingAlgs import AlgsModel
 from missions import Ui_MainWindow
 import yaml
 
+from gzCamera import gzCamera
+
 import xml.etree.ElementTree as ET
 import math
 
@@ -67,7 +69,7 @@ class Missions(qtw.QMainWindow):
 
     def load_config(self):
         try:
-            with open("config.yaml", "r") as file:
+            with open("GUI/config.yaml", "r") as file:
                 self.cfg = yaml.load(file, Loader=yaml.SafeLoader)
         except FileNotFoundError:
             print("Config not found.")      
@@ -93,6 +95,7 @@ class Missions(qtw.QMainWindow):
         self.px4 = None
         self.algs = AlgsModel()
         self.ui.comboBox_alg.setModel(self.algs)
+        self.camera = None
 
     def save_mission(self):
         nazev = self.ui.textBox_nazev_mise.toPlainText()
@@ -181,12 +184,11 @@ class Missions(qtw.QMainWindow):
         self.ui.textBox_nazev_mise.setPlainText(self.mise.names[index.row()])
 
     def stop_mission(self):
-        self.px4.send_signal(signal.SIGINT)
-        self.px4.communicate()
         for proc in psutil.process_iter():
-            if "ruby" in proc.name():
+            if "ruby" in proc.name() or "px4" in proc.name():
                 proc.send_signal(signal.SIGINT)
         self.px4 = None
+        self.camera = None
 
     def run_mission(self):
         if not self.ui.textBox_nazev_mise.toPlainText():
@@ -208,20 +210,23 @@ class Missions(qtw.QMainWindow):
         env = original_env.copy()
         env.update(env_vars)
 
-        self.px4 = subprocess.Popen(command, env=env, stdin=subprocess.PIPE)
+        self.px4 = subprocess.Popen(command, env=env, stdin=subprocess.PIPE, shell=True)
 
         os.environ.clear()
         os.environ.update(original_env)
 
-        qtc.QTimer.singleShot(15000, self.algs.list[0].run)
+        qtc.QTimer.singleShot(15000, self.algs.list[0].run) # TODO: změnit, aby odpovídal comboboxu
+
+        self.camera = gzCamera(self, self.cfg)
+        self.camera.new_frame.connect(self.updateCameraFrame)
 
     def run_stop_mission(self):
         if self.px4 is None:
-            self.run_mission()
             self.ui.but_start.setText("■ Stop")
+            self.run_mission()
             return
-        self.stop_mission()
         self.ui.but_start.setText("▶ Start")
+        self.stop_mission()
 
     def update_sdf_with_mission(self, output_file):
         tree = ET.parse(self.cfg["base_world_path"])
@@ -272,6 +277,10 @@ class Missions(qtw.QMainWindow):
     @asyncSlot()
     async def onMyEvent(self):
         pass
+
+    @qtc.Slot(float, float, float, float, float, qtg.QImage)
+    def updateCameraFrame(self, x, y, z, yaw, t, frame):
+        pass #print("New frame!")
     
 class MissionsModel(qtc.QAbstractListModel):
     def __init__(self, missionList=None):
@@ -289,12 +298,12 @@ class MissionsModel(qtc.QAbstractListModel):
         return len(self.list)
     
     def save_to_file(self):
-        with open("mise.yaml", "w") as file:
+        with open("GUI/mise.yaml", "w") as file:
             yaml.dump(self.list, file)
 
     def load_from_file(self):
         try:
-            with open("mise.yaml", "r") as file:
+            with open("GUI/mise.yaml", "r") as file:
                 self.list = yaml.load(file, Loader=yaml.SafeLoader)
                 self.names = [m["nazev"] for m in self.list]
                 self.layoutChanged.emit()

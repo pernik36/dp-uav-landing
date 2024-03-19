@@ -62,4 +62,4 @@ class mavlink_test(landingAlg, qtc.QObject):
         async for attitude in self.drone.telemetry.attitude_euler():
             pitch_deg = attitude.pitch_deg
             roll_deg = attitude.roll_deg
-            print(f"Pitch: {pitch_deg:6.2f}, Roll: {roll_deg:6.2f}", end="\r")
+            # print(f"Pitch: {pitch_deg:6.2f}, Roll: {roll_deg:6.2f}", end="\r")
