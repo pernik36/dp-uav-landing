@@ -8,7 +8,7 @@ import dt_apriltags
 from PySide6 import QtCore as qtc
 from PySide6 import QtGui as qtg
 
-# import cv2
+import cv2
 
 
 class gzCamera(qtc.QObject):
@@ -40,40 +40,39 @@ class gzCamera(qtc.QObject):
         
 
     def detect_apriltags(self, frame):
-        # frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
-        # # Convert frame to grayscale
-        # gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+        # Convert frame to grayscale
+        gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
-        # results = self.detector.detect(gray_frame, estimate_tag_pose=True, camera_params=[self.fx,self.fy,self.cx,self.cy], tag_size=1)
+        results = self.detector.detect(gray_frame, estimate_tag_pose=True, camera_params=[self.fx,self.fy,self.cx,self.cy], tag_size=1)
 
-        # x, y, z, yaw = (None, None, None, None)
+        x, y, z, yaw = (None, None, None, None)
 
-        # for result in results:
-        #     # print(result)
-        #     # Draw the AprilTag boundaries
-        #     pts = np.array(result.corners, dtype=np.int32)
-        #     pts = pts.reshape((-1, 1, 2))
-        #     isClosed = True
-        #     color = (0, 0, 255)
-        #     thickness = 2
-        #     frame = cv2.polylines(frame, [pts], isClosed, color, thickness)
+        for result in results:
+            # print(result)
+            # Draw the AprilTag boundaries
+            pts = np.array(result.corners, dtype=np.int32)
+            pts = pts.reshape((-1, 1, 2))
+            isClosed = True
+            color = (0, 0, 255)
+            thickness = 2
+            frame = cv2.polylines(frame, [pts], isClosed, color, thickness)
 
-        #     # Draw the pose information
-        #     pose = result.pose_R
-        #     trans = result.pose_t
+            # Draw the pose information
+            pose = result.pose_R
+            trans = result.pose_t
 
-        #     tag_size = self.tag_sizes[result.tag_id]
+            tag_size = self.tag_sizes[result.tag_id]
 
-        #     x = trans[0][0]*tag_size
-        #     y = trans[1][0]*tag_size
-        #     z = trans[2][0]*tag_size
-        #     yaw = pose[2][0]
+            x = trans[0][0]*tag_size
+            y = trans[1][0]*tag_size
+            z = trans[2][0]*tag_size
+            yaw = pose[2][0]
             
-        #     frame = cv2.putText(frame, f"X: {x:.2f}, Y: {y:.2f}, Z: {z:.2f}", (pts[0][0][0], pts[0][0][1] - 10),
-        #                         cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1, cv2.LINE_AA)
-        #     frame = cv2.putText(frame, f"Yaw: {yaw:.2f}", (pts[0][0][0], pts[0][0][1] - 30),
-        #                         cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1, cv2.LINE_AA)
-        x = y = z = yaw = 69.0
+            frame = cv2.putText(frame, f"X: {x:.2f}, Y: {y:.2f}, Z: {z:.2f}", (pts[0][0][0], pts[0][0][1] - 10),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1, cv2.LINE_AA)
+            frame = cv2.putText(frame, f"Yaw: {yaw:.2f}", (pts[0][0][0], pts[0][0][1] - 30),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1, cv2.LINE_AA)
 
         return frame, x, y, z, yaw
 

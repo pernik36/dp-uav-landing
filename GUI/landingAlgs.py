@@ -19,6 +19,10 @@ class landingAlg(ABC, qtc.QObject, metaclass=LAMeta):
     def run():
         pass
 
+    @abstractmethod
+    def stop():
+        pass
+
 class AlgsModel(qtc.QAbstractListModel):
     def __init__(self, algsList: list[landingAlg] | None = None):
         super().__init__()
@@ -37,13 +41,24 @@ class mavlink_test(landingAlg, qtc.QObject):
         super().__init__()
         self.drone = System()
         self.name = "MAVlink test"
+        self.tasks = []
 
     @asyncSlot(None)
     async def run(self):
         await self.drone.connect(system_address="udp://:14540")
 
-        asyncio.ensure_future(self.subscribe_attitude())
+        self.tasks.append(asyncio.ensure_future(self.subscribe_attitude()))
         # altitude_task = asyncio.ensure_future(self.print_altitude())
+
+    @asyncSlot(None)
+    async def stop(self):
+        for task in self.tasks:
+            task.cancel()
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
+        self.drone = System() # reset the connection
 
     async def print_altitude(self):
         """ Prints the altitude when it changes """

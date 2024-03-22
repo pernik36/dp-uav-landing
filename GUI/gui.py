@@ -88,7 +88,7 @@ class Missions(qtw.QMainWindow):
         pass
 
     def setup_states(self):
-        self.ui.tabWidget.setTabEnabled(1, False)   # tab not ready -> disable
+        self.ui.tabWidget.setTabEnabled(1, True)   
         self.ui.tabWidget.setTabEnabled(2, False)   # tab not ready -> disable
         self.mise = MissionsModel()                            # dict of missions, mission name as key
         self.ui.list_mise.setModel(self.mise)
@@ -96,6 +96,7 @@ class Missions(qtw.QMainWindow):
         self.algs = AlgsModel()
         self.ui.comboBox_alg.setModel(self.algs)
         self.camera = None
+        self.ui.label_cam.setScaledContents(True)
 
     def save_mission(self):
         nazev = self.ui.textBox_nazev_mise.toPlainText()
@@ -189,6 +190,9 @@ class Missions(qtw.QMainWindow):
                 proc.send_signal(signal.SIGINT)
         self.px4 = None
         self.camera = None
+        self.algs.list[0].stop()  # TODO: změnit, aby odpovídal comboboxu
+        self.ui.tabWidget.setCurrentIndex(0)
+        self.ui.tabWidget.setTabEnabled(1, False)
 
     def run_mission(self):
         if not self.ui.textBox_nazev_mise.toPlainText():
@@ -219,6 +223,9 @@ class Missions(qtw.QMainWindow):
 
         self.camera = gzCamera(self, self.cfg)
         self.camera.new_frame.connect(self.updateCameraFrame)
+
+        self.ui.tabWidget.setTabEnabled(1, True)
+        self.ui.tabWidget.setCurrentIndex(1)
 
     def run_stop_mission(self):
         if self.px4 is None:
@@ -280,7 +287,7 @@ class Missions(qtw.QMainWindow):
 
     @qtc.Slot(float, float, float, float, float, qtg.QImage)
     def updateCameraFrame(self, x, y, z, yaw, t, frame):
-        pass #print("New frame!")
+        self.ui.label_cam.setPixmap(qtg.QPixmap(frame))
     
 class MissionsModel(qtc.QAbstractListModel):
     def __init__(self, missionList=None):

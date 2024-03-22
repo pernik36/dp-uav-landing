@@ -300,6 +300,9 @@ class Ui_MainWindow(object):
         self.tabWidget.addTab(self.tab_mise, "")
         self.tab_zive = QWidget()
         self.tab_zive.setObjectName(u"tab_zive")
+        self.label_cam = QLabel(self.tab_zive)
+        self.label_cam.setObjectName(u"label_cam")
+        self.label_cam.setGeometry(QRect(10, 10, 320, 240))
         self.tabWidget.addTab(self.tab_zive, "")
         self.tab_experiment = QWidget()
         self.tab_experiment.setObjectName(u"tab_experiment")
@@ -488,6 +491,7 @@ class Ui_MainWindow(object):
 
         self.label_16.setText(QCoreApplication.translate("MainWindow", u"Algoritmus:", None))
         self.tabWidget.setTabText(self.tabWidget.indexOf(self.tab_mise), QCoreApplication.translate("MainWindow", u"Mise", None))
+        self.label_cam.setText("")
         self.tabWidget.setTabText(self.tabWidget.indexOf(self.tab_zive), QCoreApplication.translate("MainWindow", u"\u017div\u011b", None))
         self.tabWidget.setTabText(self.tabWidget.indexOf(self.tab_experiment), QCoreApplication.translate("MainWindow", u"Experiment", None))
     # retranslateUi

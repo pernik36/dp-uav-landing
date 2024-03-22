@@ -1127,6 +1127,19 @@
      <attribute name="title">
       <string>Živě</string>
      </attribute>
+     <widget class="QLabel" name="label_cam">
+      <property name="geometry">
+       <rect>
+        <x>10</x>
+        <y>10</y>
+        <width>320</width>
+        <height>240</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string/>
+      </property>
+     </widget>
     </widget>
     <widget class="QWidget" name="tab_experiment">
      <attribute name="title">
