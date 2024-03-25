@@ -147,7 +147,11 @@ class Missions(qtw.QMainWindow):
             pl_stin_sklon = mise["plosina"]["stin_sklon"]
             self.ui.pl_stin_sklon.setValue(pl_stin_sklon)
 
-            alg = self.ui.comboBox_alg.currentText()
+            alg = mise["algoritmus"]
+            try:
+                self.ui.comboBox_alg.setCurrentIndex([alg.name for alg in self.algs.list].index(alg))
+            except ValueError:
+                self.ui.comboBox_alg.setCurrentIndex(0)
         except ValueError:
             pass
 
@@ -190,7 +194,8 @@ class Missions(qtw.QMainWindow):
                 proc.send_signal(signal.SIGINT)
         self.px4 = None
         self.camera = None
-        self.algs.list[0].stop()  # TODO: změnit, aby odpovídal comboboxu
+        self.algs.list[self.ui.comboBox_alg.currentIndex()].stop()
+        self.ui.comboBox_alg.setEnabled(True)
         self.ui.tabWidget.setCurrentIndex(0)
         self.ui.tabWidget.setTabEnabled(1, False)
 
@@ -219,7 +224,8 @@ class Missions(qtw.QMainWindow):
         os.environ.clear()
         os.environ.update(original_env)
 
-        qtc.QTimer.singleShot(15000, self.algs.list[0].run) # TODO: změnit, aby odpovídal comboboxu
+        qtc.QTimer.singleShot(15000, self.algs.list[self.ui.comboBox_alg.currentIndex()].run)
+        self.ui.comboBox_alg.setEnabled(False)
 
         self.camera = gzCamera(self, self.cfg)
         self.camera.new_frame.connect(self.updateCameraFrame)

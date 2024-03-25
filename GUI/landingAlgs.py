@@ -26,7 +26,7 @@ class landingAlg(ABC, qtc.QObject, metaclass=LAMeta):
 class AlgsModel(qtc.QAbstractListModel):
     def __init__(self, algsList: list[landingAlg] | None = None):
         super().__init__()
-        self.list = algsList or [mavlink_test()]
+        self.list = algsList or [mavlink_test(), test()]
 
     def data(self, index, role):
         if role == Qt.DisplayRole:
@@ -78,3 +78,14 @@ class mavlink_test(landingAlg, qtc.QObject):
             pitch_deg = attitude.pitch_deg
             roll_deg = attitude.roll_deg
             # print(f"Pitch: {pitch_deg:6.2f}, Roll: {roll_deg:6.2f}", end="\r")
+
+class test(landingAlg, qtc.QObject):
+    def __init__(self) -> None:
+        super().__init__()
+        self.name = "Základní"
+
+    def run(self):
+        print(f"{self.name} started")
+
+    def stop(self):
+        print(f"{self.name} stopped")
