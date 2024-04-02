@@ -56,6 +56,7 @@ class PositionUpdater():
 
 
 class Missions(qtw.QMainWindow):
+    run_alg_relay_signal = qtc.Signal(float, float, gzCamera)
     def __init__(self, parent=None):
         super(Missions, self).__init__(parent=parent)
         self.load_config()
@@ -64,8 +65,8 @@ class Missions(qtw.QMainWindow):
 
         self.mise_uav_label_updater = PositionUpdater(self.ui.label_uav, self.ui.uav_x, self.ui.uav_y, self.ui.uav_phi)
         self.mise_target_label_updater = PositionUpdater(self.ui.label_tag, self.ui.pl_x, self.ui.pl_y, self.ui.pl_phi)
-        self.setup_signals_slots()
         self.setup_states()
+        self.setup_signals_slots()
 
     def load_config(self):
         try:
@@ -83,9 +84,11 @@ class Missions(qtw.QMainWindow):
             self.ui.list_mise.activated.connect(self.mission_selected)
             self.ui.list_mise.doubleClicked.connect(self.load_mission)
             self.ui.but_start.clicked.connect(self.run_stop_mission)
+            self.ui.comboBox_alg.currentIndexChanged.connect(self.on_algChange)
 
         sss_mise()
-        pass
+
+        self.run_alg_relay_signal.connect(self.algs.list[self.ui.comboBox_alg.currentIndex()].run)
 
     def setup_states(self):
         self.ui.tabWidget.setTabEnabled(1, True)   
@@ -93,10 +96,16 @@ class Missions(qtw.QMainWindow):
         self.mise = MissionsModel()                            # dict of missions, mission name as key
         self.ui.list_mise.setModel(self.mise)
         self.px4 = None
-        self.algs = AlgsModel()
+        self.algs = AlgsModel(self.cfg)
         self.ui.comboBox_alg.setModel(self.algs)
         self.camera = None
         self.ui.label_cam.setScaledContents(True)
+        # self.alg = self.algs.list[self.ui.comboBox_alg.currentIndex()]
+
+    @qtc.Slot(int)
+    def on_algChange(self, index):
+        self.run_alg_relay_signal.disconnect()
+        self.run_alg_relay_signal.connect(self.algs.list[index].run)
 
     def save_mission(self):
         nazev = self.ui.textBox_nazev_mise.toPlainText()
@@ -189,12 +198,16 @@ class Missions(qtw.QMainWindow):
         self.ui.textBox_nazev_mise.setPlainText(self.mise.names[index.row()])
 
     def stop_mission(self):
+        self.algs.list[self.ui.comboBox_alg.currentIndex()].stop()
         for proc in psutil.process_iter():
             if "ruby" in proc.name() or "px4" in proc.name():
                 proc.send_signal(signal.SIGINT)
         self.px4 = None
+        try:
+            self.camera.new_frame.disconnect()
+        except RuntimeError: # Already disconnected
+            pass
         self.camera = None
-        self.algs.list[self.ui.comboBox_alg.currentIndex()].stop()
         self.ui.comboBox_alg.setEnabled(True)
         self.ui.tabWidget.setCurrentIndex(0)
         self.ui.tabWidget.setTabEnabled(1, False)
@@ -224,7 +237,7 @@ class Missions(qtw.QMainWindow):
         os.environ.clear()
         os.environ.update(original_env)
 
-        qtc.QTimer.singleShot(15000, self.algs.list[self.ui.comboBox_alg.currentIndex()].run)
+        qtc.QTimer.singleShot(15000, self.run_alg_relay_slot)
         self.ui.comboBox_alg.setEnabled(False)
 
         self.camera = gzCamera(self, self.cfg)
@@ -232,6 +245,11 @@ class Missions(qtw.QMainWindow):
 
         self.ui.tabWidget.setTabEnabled(1, True)
         self.ui.tabWidget.setCurrentIndex(1)
+
+    def run_alg_relay_slot(self):
+        uav_pl_rel_x = self.ui.pl_x.value() - self.ui.uav_x.value()
+        uav_pl_rel_y = self.ui.pl_y.value() - self.ui.uav_y.value()
+        self.run_alg_relay_signal.emit(uav_pl_rel_x, uav_pl_rel_y, self.camera)
 
     def run_stop_mission(self):
         if self.px4 is None:
@@ -291,7 +309,7 @@ class Missions(qtw.QMainWindow):
     async def onMyEvent(self):
         pass
 
-    @qtc.Slot(float, float, float, float, float, qtg.QImage)
+    @qtc.Slot(object, object, object, object, float, qtg.QImage)
     def updateCameraFrame(self, x, y, z, yaw, t, frame):
         self.ui.label_cam.setPixmap(qtg.QPixmap(frame))
     

@@ -12,7 +12,7 @@ import cv2
 
 
 class gzCamera(qtc.QObject):
-    new_frame = qtc.Signal(float, float, float, float, float, qtg.QImage) # x, y, z, yaw, time, frame
+    new_frame = qtc.Signal(object, object, object, object, float, qtg.QImage) # x, y, z, yaw, time, frame
     def __init__(self, parent: qtc.QObject | None = ..., cfg: dict|None=...) -> None:
         super().__init__(parent)
 
@@ -85,7 +85,7 @@ class gzCamera(qtc.QObject):
 
         # Detect AprilTags in the frame with pose estimation
         frame_with_tags, x, y, z, yaw = self.detect_apriltags(frame)
-        t = time.time()
+        t = msg.header.stamp.sec + msg.header.stamp.nsec/1000000000.0
 
         bytes_per_line = 3*frame_with_tags.shape[1]
         Qframe = qtg.QImage(frame_with_tags.data, frame_with_tags.shape[1], frame_with_tags.shape[0], bytes_per_line, qtg.QImage.Format_BGR888)

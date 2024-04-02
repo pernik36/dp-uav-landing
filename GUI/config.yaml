@@ -8,3 +8,7 @@ camera:
   fy: 614.2811984891936
   cx: 289.5307050411072
   cy: 239.48850240020735
+uav_h: 10
+max_steps_wo_visual: 50
+landing_trigger_alt: 0.5
+uav_max_v: 1.5 # m/s
