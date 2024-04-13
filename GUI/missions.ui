@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>1166</width>
-    <height>602</height>
+    <height>603</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -23,11 +23,11 @@
       <x>0</x>
       <y>0</y>
       <width>1161</width>
-      <height>541</height>
+      <height>561</height>
      </rect>
     </property>
     <property name="currentIndex">
-     <number>0</number>
+     <number>2</number>
     </property>
     <property name="documentMode">
      <bool>false</bool>
@@ -1145,6 +1145,242 @@
      <attribute name="title">
       <string>Experiment</string>
      </attribute>
+     <widget class="QPushButton" name="but_remove_mise">
+      <property name="geometry">
+       <rect>
+        <x>890</x>
+        <y>210</y>
+        <width>31</width>
+        <height>25</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>↑</string>
+      </property>
+     </widget>
+     <widget class="QPushButton" name="but_add_mise">
+      <property name="geometry">
+       <rect>
+        <x>850</x>
+        <y>210</y>
+        <width>31</width>
+        <height>25</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>↓</string>
+      </property>
+     </widget>
+     <widget class="QPushButton" name="but_add_all">
+      <property name="geometry">
+       <rect>
+        <x>810</x>
+        <y>210</y>
+        <width>31</width>
+        <height>25</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>⇊</string>
+      </property>
+     </widget>
+     <widget class="QPushButton" name="but_remove_all">
+      <property name="geometry">
+       <rect>
+        <x>930</x>
+        <y>210</y>
+        <width>31</width>
+        <height>25</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>⇈</string>
+      </property>
+     </widget>
+     <widget class="QGroupBox" name="groupBox_5">
+      <property name="geometry">
+       <rect>
+        <x>10</x>
+        <y>10</y>
+        <width>561</width>
+        <height>191</height>
+       </rect>
+      </property>
+      <property name="title">
+       <string>Uložené experimenty</string>
+      </property>
+      <widget class="QColumnView" name="list_experimenty">
+       <property name="geometry">
+        <rect>
+         <x>170</x>
+         <y>70</y>
+         <width>341</width>
+         <height>111</height>
+        </rect>
+       </property>
+      </widget>
+      <widget class="QPushButton" name="but_delete_experiment">
+       <property name="geometry">
+        <rect>
+         <x>70</x>
+         <y>160</y>
+         <width>91</width>
+         <height>25</height>
+        </rect>
+       </property>
+       <property name="text">
+        <string>Odstranit</string>
+       </property>
+      </widget>
+      <widget class="QPushButton" name="but_load_experiment">
+       <property name="geometry">
+        <rect>
+         <x>70</x>
+         <y>130</y>
+         <width>91</width>
+         <height>25</height>
+        </rect>
+       </property>
+       <property name="text">
+        <string>Načíst</string>
+       </property>
+      </widget>
+      <widget class="QPushButton" name="but_save_experiment">
+       <property name="geometry">
+        <rect>
+         <x>70</x>
+         <y>100</y>
+         <width>91</width>
+         <height>25</height>
+        </rect>
+       </property>
+       <property name="text">
+        <string>Uložit</string>
+       </property>
+      </widget>
+      <widget class="QPushButton" name="but_start_experiment">
+       <property name="geometry">
+        <rect>
+         <x>70</x>
+         <y>70</y>
+         <width>91</width>
+         <height>25</height>
+        </rect>
+       </property>
+       <property name="text">
+        <string>▶ Start</string>
+       </property>
+      </widget>
+      <widget class="QPlainTextEdit" name="textBox_nazev_experimentu">
+       <property name="geometry">
+        <rect>
+         <x>70</x>
+         <y>30</y>
+         <width>441</width>
+         <height>31</height>
+        </rect>
+       </property>
+       <property name="tabChangesFocus">
+        <bool>true</bool>
+       </property>
+       <property name="lineWrapMode">
+        <enum>QPlainTextEdit::NoWrap</enum>
+       </property>
+       <property name="placeholderText">
+        <string>Název experimentu</string>
+       </property>
+      </widget>
+      <widget class="QLabel" name="label_17">
+       <property name="geometry">
+        <rect>
+         <x>10</x>
+         <y>40</y>
+         <width>51</width>
+         <height>21</height>
+        </rect>
+       </property>
+       <property name="text">
+        <string>Název:</string>
+       </property>
+       <property name="alignment">
+        <set>Qt::AlignRight|Qt::AlignTop|Qt::AlignTrailing</set>
+       </property>
+       <property name="buddy">
+        <cstring>textBox_nazev_mise</cstring>
+       </property>
+      </widget>
+     </widget>
+     <widget class="QGroupBox" name="groupBox_6">
+      <property name="geometry">
+       <rect>
+        <x>600</x>
+        <y>10</y>
+        <width>551</width>
+        <height>191</height>
+       </rect>
+      </property>
+      <property name="title">
+       <string>Výběr misí</string>
+      </property>
+      <widget class="QListView" name="list_mise_2">
+       <property name="geometry">
+        <rect>
+         <x>10</x>
+         <y>30</y>
+         <width>531</width>
+         <height>151</height>
+        </rect>
+       </property>
+       <property name="selectionMode">
+        <enum>QAbstractItemView::ExtendedSelection</enum>
+       </property>
+      </widget>
+     </widget>
+     <widget class="QGroupBox" name="groupBox_7">
+      <property name="geometry">
+       <rect>
+        <x>9</x>
+        <y>219</y>
+        <width>1141</width>
+        <height>301</height>
+       </rect>
+      </property>
+      <property name="title">
+       <string>Definice experimentu</string>
+      </property>
+      <widget class="QTableView" name="table_experiment">
+       <property name="geometry">
+        <rect>
+         <x>10</x>
+         <y>30</y>
+         <width>1121</width>
+         <height>261</height>
+        </rect>
+       </property>
+       <property name="editTriggers">
+        <set>QAbstractItemView::AnyKeyPressed|QAbstractItemView::DoubleClicked|QAbstractItemView::SelectedClicked</set>
+       </property>
+       <property name="selectionBehavior">
+        <enum>QAbstractItemView::SelectRows</enum>
+       </property>
+       <property name="sortingEnabled">
+        <bool>false</bool>
+       </property>
+       <attribute name="horizontalHeaderShowSortIndicator" stdset="0">
+        <bool>false</bool>
+       </attribute>
+       <attribute name="verticalHeaderVisible">
+        <bool>false</bool>
+       </attribute>
+      </widget>
+     </widget>
+     <zorder>groupBox_7</zorder>
+     <zorder>groupBox_5</zorder>
+     <zorder>but_remove_mise</zorder>
+     <zorder>but_add_mise</zorder>
+     <zorder>but_add_all</zorder>
+     <zorder>but_remove_all</zorder>
+     <zorder>groupBox_6</zorder>
     </widget>
    </widget>
   </widget>

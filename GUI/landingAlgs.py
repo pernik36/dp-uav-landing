@@ -1,4 +1,5 @@
 from math import atan, radians, tan, pi
+from gzUAVPose import gzUAVPose
 pipul = pi/2
 from mavsdk import System
 from mavsdk.action import ActionError
@@ -14,6 +15,9 @@ from qasync import asyncSlot
 import asyncio
 
 from gzCamera import gzCamera
+from gzClock import gzClock
+from mission_result import MissionResult
+from algStateTransition import algStateTransition as stateTransition
 
 from grpc._channel import _MultiThreadedRendezvous
 
@@ -28,19 +32,23 @@ class landingAlg(ABC, qtc.QObject, metaclass=LAMeta):
 
     def __init__(self, cfg) -> None:
         self.cfg = cfg
+        self.state_transitions = []
 
     @abstractmethod
-    def run(self, uav_pl_rel_x, uav_pl_rel_y, camera):
+    def run(self, mission, uav_pl_rel_x, uav_pl_rel_y, camera):
         pass
 
     @abstractmethod
     def stop():
         pass
 
+    def log_state_transition(self, target_state_i):
+        self.state_transitions.append(stateTransition(self.state.i, target_state_i, self.clock.time.sim, self.UAVPose.pose))
+
 class AlgsModel(qtc.QAbstractListModel):
     def __init__(self, cfg, algsList: list[landingAlg] | None = None):
         super().__init__()
-        self.list = algsList or [mavlink_test(cfg), OffboardPID(cfg, name="P0.5"), OffboardPID(cfg, name="P0.8 I0.01", k_p=0.8, k_i=0.01), OffboardPID(cfg, name="P2 I0.2", k_p=2, k_i=0.2)]
+        self.list = algsList or [TakeoffAndLand(cfg), TakeoffAndLand(cfg, "Vzleť a Přistaň 3m", h=3), mavlink_test(cfg), OffboardPID(cfg, name="P0.5"), OffboardPID(cfg, name="P0.8 I0.01", k_p=0.8, k_i=0.01), OffboardPID(cfg, name="P2 I0.2", k_p=2, k_i=0.2)]
 
     def data(self, index, role):
         if role == Qt.DisplayRole:
@@ -51,27 +59,41 @@ class AlgsModel(qtc.QAbstractListModel):
         return len(self.list)
     
 class algState():
-    def __init__(self, name, step) -> None:
+    def __init__(self, index, name, step) -> None:
         self.name = name
         self.step = step
+        self.i = index
     
 class mavlink_test(landingAlg, qtc.QObject):
+    ended = qtc.Signal(MissionResult)
     def __init__(self, cfg) -> None:
-        super().__init__(cfg)
+        landingAlg.__init__(self, cfg)
+        qtc.QObject.__init__(self)
+        self.stopped = True
         self.drone = System()
         self.name = "MAVlink test"
         self.tasks = []
 
-    @asyncSlot(float, float, gzCamera)
-    async def run(self, uav_pl_rel_x, uav_pl_rel_y, camera: gzCamera):
+    @asyncSlot(dict, float, float, gzCamera)
+    async def run(self, mission, uav_pl_rel_x, uav_pl_rel_y, camera: gzCamera):
+        self.stopped = False
+        self.clock = gzClock()
+        self.UAVPose = gzUAVPose(self.cfg)
+        self.mission = mission
         await self.drone.connect(system_address="udp://:14540")
         self.cam = camera
 
         self.tasks.append(asyncio.ensure_future(self.subscribe_attitude()))
         # altitude_task = asyncio.ensure_future(self.subscribe_altitude())
+        self.start_time = self.clock.time
 
     @asyncSlot(None)
     async def stop(self):
+        if self.stopped:
+            return
+        self.stopped = True
+        self.clock.stop()
+        self.UAVPose.stop()
         for task in self.tasks:
             task.cancel()
             try:
@@ -79,6 +101,7 @@ class mavlink_test(landingAlg, qtc.QObject):
             except asyncio.CancelledError:
                 pass
         self.drone = System() # reset the connection
+        self.ended.emit(MissionResult(self.mission, self.start_time, self.clock.time, self.UAVPose.pose))
 
     async def subscribe_altitude(self):
         """ Prints the altitude when it changes """
@@ -106,17 +129,20 @@ class mavlink_test(landingAlg, qtc.QObject):
             pass
 
 class OffboardPID(landingAlg, qtc.QObject):
+    ended = qtc.Signal(MissionResult)
     def __init__(self, cfg, name = "Základní", k_p=0.5, k_i=0, k_d=0) -> None:
-        super().__init__(cfg)
+        landingAlg.__init__(self, cfg)
+        qtc.QObject.__init__(self)
+        self.stopped = True
         self.drone = System()
         self.name = name
         self.tasks = []
-        self.states = [algState("preflight", self.preflightStep)        # --> 0
-                      ,algState("takeoff", self.takeoffStep)            # --> 1
-                      ,algState("hover", self.hoverStep)                # --> 2
-                      ,algState("find_target", self.find_targetStep)    # --> 3
-                      ,algState("centering", self.centeringStep)        # --> 4
-                      ,algState("landing", self.landingStep)            # --> 5
+        self.states = [algState(0, "preflight", self.preflightStep)        # --> 0
+                      ,algState(1, "takeoff", self.takeoffStep)            # --> 1
+                      ,algState(2, "hover", self.hoverStep)                # --> 2
+                      ,algState(3, "find_target", self.find_targetStep)    # --> 3
+                      ,algState(4, "centering", self.centeringStep)        # --> 4
+                      ,algState(5, "landing", self.landingStep)            # --> 5
                       ]
         self.state = self.states[0]
         self.stateTransitions = [[None for s in self.states] for t in self.states]
@@ -132,8 +158,12 @@ class OffboardPID(landingAlg, qtc.QObject):
         self.pid_p = PID(k_p, k_i, k_d, setpoint=0, auto_mode=False, output_limits=(-v_max, v_max))
         self.pid_y = PID(k_p, k_i, k_d, setpoint=0, auto_mode=False)
 
-    @asyncSlot(float, float, gzCamera)
-    async def run(self, uav_pl_rel_x, uav_pl_rel_y, camera: gzCamera):
+    @asyncSlot(dict, float, float, gzCamera)
+    async def run(self, mission, uav_pl_rel_x, uav_pl_rel_y, camera: gzCamera):
+        self.clock = gzClock()
+        self.UAVPose = gzUAVPose(self.cfg)
+        self.stopped = False
+        self.mission = mission
         await self.drone.connect(system_address="udp://:14540")
         async for state in self.drone.core.connection_state():
             if state.is_connected:
@@ -167,6 +197,10 @@ class OffboardPID(landingAlg, qtc.QObject):
 
     @asyncSlot(None)
     async def stop(self):
+        if self.stopped:
+            return
+        self.stopped = True
+        self.clock.stop()
         for task in self.tasks:
             task.cancel()
             try:
@@ -179,6 +213,7 @@ class OffboardPID(landingAlg, qtc.QObject):
             self.cam.new_frame.disconnect()
         except RuntimeError: # Already disconnected
             pass
+        self.ended.emit(MissionResult(self.mission, self.start_time, self.clock.time, self.UAVPose.pose, self.state_transitions))
 
     async def subscribe_altitude(self):
         try:
@@ -224,7 +259,8 @@ class OffboardPID(landingAlg, qtc.QObject):
         self.stepTimer.blockSignals(False)
 
     async def trans_preflight2takeoff(self):
-        print("-- Switching the state from preflight to takeoff")
+        new_state = self.states[1]
+        print(f"-- Switching the state from {self.state.name} to {new_state.name}")
         print("-- Arming")
         retry = True
         delay = 2
@@ -241,9 +277,11 @@ class OffboardPID(landingAlg, qtc.QObject):
         print("-- Taking off")
         await self.drone.action.set_takeoff_altitude(10.0)
         await self.drone.action.takeoff()
+        self.start_time = self.clock.time
 
-        self.state = self.states[1] # change state to taking off
-        print("-- Switched the state to takeoff")
+        self.log_state_transition(new_state.i)
+        self.state = new_state
+        print(f"-- State switched to {new_state.name}")
 
     async def takeoffStep(self):
         if not self.landed_state == LandedState.IN_AIR:
@@ -257,6 +295,7 @@ class OffboardPID(landingAlg, qtc.QObject):
     async def trans2find_target(self):
         new_state = self.states[3]
         print(f"-- Switching the state from {self.state.name} to {new_state.name}")
+        self.log_state_transition(new_state.i)
         self.state = new_state
         print(f"-- State switched to {new_state.name}")
 
@@ -313,9 +352,8 @@ class OffboardPID(landingAlg, qtc.QObject):
         print("-- AprilTag not found in the image.", end="\r")
 
     async def trans_find_target2centering(self):
-        print("-- Switching the state from find the target to centering")
-        self.state = self.states[4]
-        print("-- State switched to centering")
+        new_state = self.states[4]
+        print(f"-- Switching the state from {self.state.name} to {new_state.name}")
 
         print("-- Setting initial offboard control setpoint")
         await self.drone.offboard.set_velocity_body(VelocityBodyYawspeed(0.0, 0.0, 0.0, 0.0))
@@ -341,7 +379,11 @@ class OffboardPID(landingAlg, qtc.QObject):
                 await asyncio.sleep(delay)
                 delay *= 1.5
 
-        print("   Failed to start the offboard mode")
+        print("   Failed to start the offboard mode") # TODO: Osetrit, co v tomto pripade delat
+
+        self.log_state_transition(new_state.i)
+        self.state = new_state
+        print("-- State switched to centering")
 
     @asyncSlot(object, object, object, object, float, qtg.QImage)
     async def centeringCamStep(self, x, y, z, yaw, t, frame):
@@ -419,7 +461,10 @@ class OffboardPID(landingAlg, qtc.QObject):
         self.cam.new_frame.disconnect(self.centeringCamStep)
         new_state = self.states[5]
         print(f"-- Switching the state from {self.state.name} to {new_state.name}")
+        print(f"-- State switched to {new_state.name}")
+        self.log_state_transition(new_state.i)
         self.state = new_state
+        print(f"-- Switching the state from {self.state.name} to {new_state.name}")
         print(f"-- State switched to {new_state.name}")
         await self.drone.action.land()
         self.stepTimer.blockSignals(False)
@@ -428,9 +473,163 @@ class OffboardPID(landingAlg, qtc.QObject):
         pass
 
     async def landingStep(self):
+        if not self.landed_state == LandedState.ON_GROUND:
+            return
+        self.stepTimer.blockSignals(True)
+        print("-- Landed.")
+        await self.stop()
+
+class TakeoffAndLand(landingAlg, qtc.QObject):
+    ended = qtc.Signal(MissionResult)
+    def __init__(self, cfg, name = "Vzleť a Přistaň", h = 2) -> None:
+        landingAlg.__init__(self, cfg)
+        qtc.QObject.__init__(self)
+        self.stopped = True
+        self.drone = System()
+        self.name = name
+        self.tasks = []
+        self.states = [algState(0, "preflight", self.preflightStep)        # --> 0
+                      ,algState(1, "takeoff", self.takeoffStep)            # --> 1
+                      ,algState(2, "landing", self.landingStep)            # --> 2
+                      ]
+        self.state = self.states[0]
+        self.stateTransitions = [[None for s in self.states] for t in self.states]
+        self.stateTransitions[0][1] = self.trans_preflight2takeoff
+        self.stateTransitions[1][2] = self.trans_takeoff2landing
+
+        self.takeoff_h = h
+
+    @asyncSlot(dict, float, float, gzCamera)
+    async def run(self, mission, uav_pl_rel_x, uav_pl_rel_y, camera: gzCamera):
+        self.clock = gzClock()
+        self.UAVPose = gzUAVPose(self.cfg)
+        self.stopped = False
+        self.mission = mission
+        await self.drone.connect(system_address="udp://:14540")
+        async for state in self.drone.core.connection_state():
+            if state.is_connected:
+                break
+
+        self.last_t = None
+
+        self.state = self.states[0]
+
+        self.tasks.append(asyncio.ensure_future(self.subscribe_altitude()))
+        self.tasks.append(asyncio.ensure_future(self.subscribe_flight_mode()))
+        self.tasks.append(asyncio.ensure_future(self.subscribe_landed_state()))
+
+        self.cam = camera
+
+        self.stepTimer = qtc.QTimer()
+        self.stepTimer.timeout.connect(self.step)
+        self.stepTimer.start(100)
+
+        self.uav_pl_rel_x = uav_pl_rel_x
+        self.uav_pl_rel_y = uav_pl_rel_y
+
+    @asyncSlot(None)
+    async def step(self):
+        await self.state.step()
+
+    @asyncSlot(None)
+    async def stop(self):
+        if self.stopped:
+            return
+        self.stopped = True
+        self.clock.stop()
+        for task in self.tasks:
+            task.cancel()
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
+        self.drone = System() # reset the connection
+        self.stepTimer.stop()
+        try:
+            self.cam.new_frame.disconnect()
+        except RuntimeError: # Already disconnected
+            pass
+        self.ended.emit(MissionResult(self.mission, self.start_time, self.clock.time, self.UAVPose.pose, self.state_transitions))
+        print("Ended signal emitted")
+
+    async def subscribe_altitude(self):
+        try:
+            async for position in self.drone.telemetry.position():
+                self.altitude = position.relative_altitude_m
+                # print(f"h = {self.altitude} m", end = "\r")
+        except _MultiThreadedRendezvous:
+            pass
+
+    async def subscribe_flight_mode(self):
+        try:
+            async for flight_mode in self.drone.telemetry.flight_mode():
+                self.flight_mode = flight_mode
+        except _MultiThreadedRendezvous:
+            pass
+    async def subscribe_landed_state(self):
+        try:
+            async for state in self.drone.telemetry.landed_state():
+                self.landed_state = state
+        except _MultiThreadedRendezvous:
+            pass
+
+    async def preflightStep(self):
+        self.stepTimer.blockSignals(True)
+        async for health in self.drone.telemetry.health():
+            if health.is_global_position_ok and health.is_home_position_ok:
+                break
+            else:
+                self.stepTimer.blockSignals(False)
+                return
+            
+        print("-- Global position state is good enough for flying.")
+        await self.trans_preflight2takeoff()
+        self.stepTimer.blockSignals(False)
+
+    async def trans_preflight2takeoff(self):
+        new_state = self.states[1]
+        print(f"-- Switching the state from {self.state.name} to {new_state.name}")
+        print("-- Arming")
+        retry = True
+        delay = 2
+        while retry:
+            try:
+                await self.drone.action.arm()
+                retry = False
+            except ActionError as e:
+                print(e)
+                print("   Retrying in", delay)
+                await asyncio.sleep(delay)
+                delay *= 1.5
+
+        print("-- Taking off")
+        await self.drone.action.set_takeoff_altitude(self.takeoff_h)
+        await self.drone.action.takeoff()
+        self.start_time = self.clock.time
+
+        self.log_state_transition(new_state.i)
+        self.state = new_state # change state to taking off
+        print(f"-- State switched to {new_state.name}")
+
+    async def takeoffStep(self):
         if not self.landed_state == LandedState.IN_AIR:
             return
         self.stepTimer.blockSignals(True)
-        await asyncio.sleep(2)
+        await self.stateTransitions[self.states.index(self.state)][2]()
+        
+
+    async def trans_takeoff2landing(self):
+        new_state = self.states[2]
+        print(f"-- Switching the state from {self.state.name} to {new_state.name}")
+        self.log_state_transition(new_state.i)
+        self.state = new_state
+        print(f"-- State switched to {new_state.name}")
+        await self.drone.action.land()
+        self.stepTimer.blockSignals(False)
+
+    async def landingStep(self):
+        if not self.landed_state == LandedState.ON_GROUND:
+            return
+        self.stepTimer.blockSignals(True)
         print("-- Landed.")
         await self.stop()

@@ -1,7 +1,9 @@
+from copy import copy
 import os
 import signal
 import subprocess
 import sys
+from types import NoneType
 from typing import Optional
 from PySide6 import QtCore as qtc
 from PySide6 import QtWidgets as qtw
@@ -15,6 +17,9 @@ import asyncio
 
 from landingAlgs import AlgsModel
 from missions import Ui_MainWindow
+from mission_result import MissionResult
+from experiment_runner import ExperimentRunner
+
 import yaml
 
 from gzCamera import gzCamera
@@ -56,7 +61,7 @@ class PositionUpdater():
 
 
 class Missions(qtw.QMainWindow):
-    run_alg_relay_signal = qtc.Signal(float, float, gzCamera)
+    run_alg_relay_signal = qtc.Signal(dict, float, float, gzCamera)
     def __init__(self, parent=None):
         super(Missions, self).__init__(parent=parent)
         self.load_config()
@@ -86,21 +91,62 @@ class Missions(qtw.QMainWindow):
             self.ui.but_start.clicked.connect(self.run_stop_mission)
             self.ui.comboBox_alg.currentIndexChanged.connect(self.on_algChange)
 
+        def sss_experimenty():
+            self.ui.but_add_mise.clicked.connect(self.add_mission_to_experiment)
+            self.ui.but_remove_mise.clicked.connect(self.remove_mission_from_experiment)
+
+            self.ui.but_save_experiment.clicked.connect(self.save_experiment)
+            self.ui.but_delete_experiment.clicked.connect(self.delete_experiment)
+            self.ui.but_load_experiment.clicked.connect(self.load_experiment)
+            self.ui.but_start_experiment.clicked.connect(self.run_stop_experiment)
+            self.ui.list_experimenty.clicked.connect(self.experiment_selected)
+            self.ui.list_experimenty.activated.connect(self.experiment_selected)
+            self.ui.list_experimenty.doubleClicked.connect(self.load_experiment)
+
+            self.experiment_runner.run_mission.connect(self.run_mission_from_experiment)
+            self.experiment_runner.stop_mission.connect(self.stop_mission)
+            for alg in self.algs.list:
+                self.experiment_runner.register_alg(alg)
+
         sss_mise()
+        sss_experimenty()
 
         self.run_alg_relay_signal.connect(self.algs.list[self.ui.comboBox_alg.currentIndex()].run)
 
     def setup_states(self):
-        self.ui.tabWidget.setTabEnabled(1, True)   
-        self.ui.tabWidget.setTabEnabled(2, False)   # tab not ready -> disable
-        self.mise = MissionsModel()                            # dict of missions, mission name as key
+        self.ui.tabWidget.setTabEnabled(1, True)
+        self.ui.tabWidget.setTabEnabled(2, True)
+        self.mise = MissionsModel()  
+        self.experimenty = ExperimentsModel(self.cfg, self.mise)
+        self.current_experiment = ExperimentModel(self.cfg, ["pokus1", "pokus3"], [1, 2], all_missions=self.mise)
+        self.experiment_runner = ExperimentRunner(self.cfg, self)
         self.ui.list_mise.setModel(self.mise)
+        self.ui.list_mise_2.setModel(self.mise)
+        self.ui.list_experimenty.setModel(self.experimenty)
         self.px4 = None
         self.algs = AlgsModel(self.cfg)
         self.ui.comboBox_alg.setModel(self.algs)
         self.camera = None
         self.ui.label_cam.setScaledContents(True)
         # self.alg = self.algs.list[self.ui.comboBox_alg.currentIndex()]
+
+        self.ui.table_experiment.setModel(self.current_experiment)
+        for i, c in enumerate(self.current_experiment.columns):
+            if c in self.cfg["exclude_mission_columns_in_experiment_table"]:
+                self.ui.table_experiment.setColumnHidden(i, True)
+
+    def add_mission_to_experiment(self):
+        for index in self.ui.list_mise_2.selectedIndexes():
+            self.current_experiment.add(self.mise.names[index.row()])
+
+    def remove_mission_from_experiment(self):
+        rows_removed = []
+        for index in self.ui.table_experiment.selectedIndexes():
+            row = index.row()
+            if row in rows_removed:
+                continue
+            rows_removed.append(row)
+            self.current_experiment.remove(self.current_experiment.names[row])
 
     @qtc.Slot(int)
     def on_algChange(self, index):
@@ -111,10 +157,20 @@ class Missions(qtw.QMainWindow):
         nazev = self.ui.textBox_nazev_mise.toPlainText()
         if not nazev: return
         self.mise.save(self.tabMise_mission_dict())
+    
+    def save_experiment(self):
+        nazev = self.ui.textBox_nazev_experimentu.toPlainText()
+        if not nazev: return
+        self.current_experiment = self.experimenty.save(self.current_experiment, nazev)
+        self.ui.table_experiment.setModel(self.current_experiment)
 
     def delete_mission(self):
         nazev = self.ui.textBox_nazev_mise.toPlainText()
         self.mise.remove(nazev)
+
+    def delete_experiment(self):
+        nazev = self.ui.textBox_nazev_experimentu.toPlainText()
+        self.experimenty.remove(nazev)
 
     def load_mission(self, index = None):
         try:
@@ -164,6 +220,22 @@ class Missions(qtw.QMainWindow):
         except ValueError:
             pass
 
+    def load_experiment(self, index:qtc.QModelIndex|NoneType=None):
+        try:
+            if index:
+                nazev = self.experimenty.names[index.row()]
+                self.ui.textBox_nazev_experimentu.setPlainText(nazev)
+                experiment = self.experimenty.list[index.row()]
+            else:
+                nazev = self.ui.textBox_nazev_experimentu.toPlainText()
+                experiment = self.experimenty.get(nazev)
+            self.current_experiment = experiment.copy()
+
+        except ValueError:
+            pass
+        
+        self.ui.table_experiment.setModel(self.current_experiment)
+
     def tabMise_mission_dict(self):
         pl_x = self.ui.pl_x.value()
         pl_y = self.ui.pl_y.value()
@@ -197,15 +269,17 @@ class Missions(qtw.QMainWindow):
     def mission_selected(self, index):
         self.ui.textBox_nazev_mise.setPlainText(self.mise.names[index.row()])
 
+    def experiment_selected(self, index:qtc.QModelIndex):
+        self.ui.textBox_nazev_experimentu.setPlainText(self.experimenty.names[index.row()])
+
     def stop_mission(self):
-        self.algs.list[self.ui.comboBox_alg.currentIndex()].stop()
         for proc in psutil.process_iter():
             if "ruby" in proc.name() or "px4" in proc.name():
                 proc.send_signal(signal.SIGINT)
         self.px4 = None
         try:
             self.camera.new_frame.disconnect()
-        except RuntimeError: # Already disconnected
+        except RuntimeError or AttributeError: # Already disconnected
             pass
         self.camera = None
         self.ui.comboBox_alg.setEnabled(True)
@@ -221,7 +295,7 @@ class Missions(qtw.QMainWindow):
             'PX4_SYS_AUTOSTART': self.cfg["px4_sys_autostart"],
             'PX4_GZ_MODEL': self.cfg["gz_model"],
             'PX4_GZ_WORLD': self.ui.textBox_nazev_mise.toPlainText(),
-            'PX4_GZ_MODEL_POSE': " ".join((str(self.ui.uav_x.value()), str(self.ui.uav_y.value()), "0", "0", "0", str(self.ui.uav_phi.value())))
+            'PX4_GZ_MODEL_POSE': " ".join((str(self.ui.uav_x.value()), str(self.ui.uav_y.value()), "0.2", "0", "0", str(self.ui.uav_phi.value())))
         }
 
         self.update_sdf_with_mission(self.ui.textBox_nazev_mise.toPlainText()+".sdf")
@@ -249,7 +323,7 @@ class Missions(qtw.QMainWindow):
     def run_alg_relay_slot(self):
         uav_pl_rel_x = self.ui.pl_x.value() - self.ui.uav_x.value()
         uav_pl_rel_y = self.ui.pl_y.value() - self.ui.uav_y.value()
-        self.run_alg_relay_signal.emit(uav_pl_rel_x, uav_pl_rel_y, self.camera)
+        self.run_alg_relay_signal.emit(self.tabMise_mission_dict(), uav_pl_rel_x, uav_pl_rel_y, self.camera)
 
     def run_stop_mission(self):
         if self.px4 is None:
@@ -257,7 +331,28 @@ class Missions(qtw.QMainWindow):
             self.run_mission()
             return
         self.ui.but_start.setText("▶ Start")
+        self.algs.list[self.ui.comboBox_alg.currentIndex()].stop()
         self.stop_mission()
+
+    def run_mission_from_experiment(self, name):
+        self.ui.textBox_nazev_mise.setPlainText(name)
+        self.load_mission()
+        self.run_stop_mission()
+
+    def current_experiment_name(self):
+        return self.ui.textBox_nazev_experimentu.toPlainText()
+
+    def run_stop_experiment(self):
+        if not self.experiment_runner.running:
+            if self.px4 is not None:
+                return
+            self.ui.but_start_experiment.setText("■ Stop")
+            self.experiment_runner.run(self.current_experiment, self.current_experiment_name())
+            return
+        if self.px4 is not None:
+            self.run_stop_mission()
+        self.ui.but_start_experiment.setText("▶ Start")
+        self.experiment_runner.stop()
 
     def update_sdf_with_mission(self, output_file):
         tree = ET.parse(self.cfg["base_world_path"])
@@ -363,6 +458,180 @@ class MissionsModel(qtc.QAbstractListModel):
 
     def get(self, missionName):
         index = self.names.index(missionName)
+        return self.list[index]
+    
+class ExperimentModel(qtc.QAbstractTableModel):
+    def __init__(self, cfg, names, Ns, all_missions: MissionsModel):
+        super().__init__()
+        self.cfg=cfg
+        self.names = names or []
+        self.Ns = Ns or [0 for _ in self.names]
+        self.missions = all_missions
+        self.remove_nonexistent_missions()
+        self.columns = self.extract_column_names(self.cfg["sample_mission"])
+
+    def remove_nonexistent_missions(self):
+        i = 0
+        while i<len(self.names):
+            name = self.names[i]
+            if name not in self.missions.names:
+                self.names.pop(i)
+                self.Ns.pop(i)
+                continue
+            i+=1
+
+    def extract_column_names(self, data, parent_key='', sep='.'):
+        column_names = []
+        for k, v in data.items():
+            new_key = f"{parent_key}{sep}{k}" if parent_key else k
+            if isinstance(v, dict):
+                column_names.extend(self.extract_column_names(v, new_key, sep))
+            else:
+                column_names.append(new_key)
+        return column_names
+    
+    def get_value_for_column(self, mission_name, column_name):
+        keys = column_name.split('.')
+        value = self.missions.get(mission_name)
+        try:
+            for key in keys:
+                value = value[key]
+            return value
+        except KeyError:
+            return None
+
+    def data(self, index, role):
+        if role == Qt.DisplayRole or role == Qt.ItemDataRole.EditRole:
+            if index.column() == len(self.columns):
+                return self.Ns[index.row()]
+            mission_name = self.names[index.row()]
+            return self.get_value_for_column(mission_name, self.columns[index.column()])
+        
+    def setData(self, index: qtc.QModelIndex | qtc.QPersistentModelIndex, value, role: int = ...) -> bool:
+        if role == Qt.EditRole:
+            if index.column() == len(self.columns):
+                try:
+                    value = int(value)
+                    if value<0: return False
+                    self.Ns[index.row()] = value
+                    return True
+                except ValueError:
+                    pass
+            return False
+        
+    def flags(self, index):
+        default_flags = super().flags(index)
+        if index.column() == len(self.columns):
+            return Qt.ItemFlag.ItemIsEnabled|Qt.ItemFlag.ItemIsSelectable|Qt.ItemFlag.ItemIsEditable
+        return default_flags
+        
+    def headerData(self, section: int, orientation: Qt.Orientation, role: int = ...):
+        if role == Qt.DisplayRole and orientation == Qt.Orientation.Horizontal:
+            if section == len(self.columns):
+                return "N" # last column is the number of times the mission should be run
+            try:
+                current = self.columns[section]
+                previous = self.columns[section-1]
+                current_split = current.split('.')
+                if current_split[0] == previous.split('.')[0]:
+                    return "."+current_split[-1]
+            except IndexError:
+                pass
+            return current
+        return super().headerData(section, orientation, role)
+
+    def rowCount(self, index):
+        return len(self.names)
+    
+    def columnCount(self, index):
+        return len(self.columns) + 1
+
+    def remove(self, missionName):
+        index = self.names.index(missionName)
+        self.Ns.pop(index)
+        self.names.pop(index)
+        self.layoutChanged.emit()
+
+    def add(self, missionName):
+        try:
+            i = self.names.index(missionName)
+            self.Ns[i] += self.cfg["default_mission_repeats"]
+        except ValueError:
+            self.names.append(missionName)
+            self.Ns.append(self.cfg["default_mission_repeats"])
+        self.layoutChanged.emit()
+
+    def get(self, missionName):
+        index = self.names.index(missionName)
+        return self.list[index]
+    
+    def dict(self):
+        return {"mise": {mission_name: reps for mission_name, reps in zip(self.names, self.Ns)}}
+    
+    def copy(self):
+        return ExperimentModel(self.cfg, copy(self.names), copy(self.Ns), self.missions)
+    
+class ExperimentsModel(qtc.QAbstractListModel):
+    def __init__(self, cfg, missions: MissionsModel):
+        super().__init__()
+        self.cfg=cfg
+        self.list = []
+        self.names = []
+        self.missions = missions
+        self.load_from_file()
+
+    def data(self, index, role):
+        if role == Qt.DisplayRole:
+            return self.names[index.row()]
+
+    def rowCount(self, index):
+        return len(self.list)
+    
+    def save_to_file(self):
+        dict_list = []
+        for name, e in zip(self.names, self.list):
+            dict_list.append(e.dict())
+            dict_list[-1]["nazev"] = name
+
+        with open(self.cfg["experiments_file"], "w") as file:
+            yaml.dump(dict_list, file)
+
+    def load_from_file(self):
+        self.names = []
+        self.list = []
+        try:
+            with open(self.cfg["experiments_file"], "r") as file:
+                dict_list = yaml.load(file, Loader=yaml.SafeLoader)
+                for e in dict_list:
+                    self.names.append(e["nazev"])
+                    self.list.append(ExperimentModel(self.cfg, list(e["mise"].keys()), list(e["mise"].values()), self.missions))
+                self.layoutChanged.emit()
+        except FileNotFoundError:
+            pass
+    
+    def save(self, experiment: ExperimentModel, name):
+        try:
+            index = self.names.index(name)
+            self.list[index] = experiment
+        except ValueError:
+            self.list.append(experiment)
+            self.names.append(name)
+            self.layoutChanged.emit()
+        self.save_to_file()
+        return experiment.copy()
+
+    def remove(self, experimentName):
+        try:
+            index = self.names.index(experimentName)
+            self.list.pop(index)
+            self.names.pop(index)
+            self.layoutChanged.emit()
+            self.save_to_file()
+        except ValueError:
+            pass
+
+    def get(self, experimentName) -> ExperimentModel:
+        index = self.names.index(experimentName)
         return self.list[index]
         
 
