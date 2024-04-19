@@ -8,6 +8,9 @@ camera:
   fy: 614.2811984891936
   cx: 289.5307050411072
   cy: 239.48850240020735
+  height_offset: 0.12
+  x_offset: 0.15
+  y_offset: 0.2
 uav_h: 10
 max_steps_wo_visual: 50
 landing_trigger_alt: 0.5
@@ -16,3 +19,7 @@ exclude_mission_columns_in_experiment_table: ["plosina.stin_sklon", "plosina.phi
 experiments_file: GUI/experimenty.yaml
 default_mission_repeats: 1
 sample_mission: {algoritmus: "", nazev: "", plosina: {a: 0, phi: 0, stin: 0, stin_sklon: 0, x: 0, y: 0}, uav: {phi: 0.0, x: 0.0, y: 0.0}, vitr: {phi: 0.0, s_phi: 0.0, s_v: 0, v: 0}}
+origin:
+  lat_deg: 49.7241594
+  lon_deg: 13.3658769
+  elevation: 345.8

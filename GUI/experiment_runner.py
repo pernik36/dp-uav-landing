@@ -8,6 +8,7 @@ from qasync import asyncSlot
 class ExperimentRunner(qtc.QObject):
     run_mission = qtc.Signal(str)
     stop_mission = qtc.Signal(None)
+    stop_experiment = qtc.Signal(None)
     def __init__(self, cfg, app) -> None:
         super().__init__()
         self.running = False
@@ -21,6 +22,8 @@ class ExperimentRunner(qtc.QObject):
         self.experiment_name = name
         self.i = start
         self.N = 0
+        current_datetime = datetime.now().isoformat(timespec='seconds')
+        self.filename = f"experiment_results/{current_datetime}_{self.experiment_name}.yaml"
         self.step()
 
     def step(self):
@@ -48,22 +51,20 @@ class ExperimentRunner(qtc.QObject):
         if not self.running:
             return
         print("Ended signal received")
+        print("Saving results of mission ", result.mission_def["nazev"])
+        self.results.append(result)
+        with open(self.filename, 'w') as file:
+            yaml.dump([result.to_dict() for result in self.results], file)
         self.stop_mission.emit()
         while self.app.px4 is not None:
             print("Waiting for PX4 to be stoppped.", end="\r")
             await asyncio.sleep(0.5)
-        print("Saving results")
-        self.results.append(result)
         self.step()
 
     def stop(self):
         self.running = False
-        current_datetime = datetime.now().isoformat(timespec='seconds')
-        filename = f"experiment_results/{current_datetime}_{self.experiment_name}.yaml"
-        with open(filename, 'w') as file:
-            yaml.dump([result.to_dict() for result in self.results], file)
+        self.stop_experiment.emit()
         for result in self.results:
             print(result.to_dict())
-        # vymyslet něco s vyhodnocením
 
     

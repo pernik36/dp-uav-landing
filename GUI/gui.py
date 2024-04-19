@@ -105,6 +105,7 @@ class Missions(qtw.QMainWindow):
 
             self.experiment_runner.run_mission.connect(self.run_mission_from_experiment)
             self.experiment_runner.stop_mission.connect(self.stop_mission)
+            self.experiment_runner.stop_experiment.connect(self.experiment_stopped)
             for alg in self.algs.list:
                 self.experiment_runner.register_alg(alg)
 
@@ -278,13 +279,21 @@ class Missions(qtw.QMainWindow):
                 proc.send_signal(signal.SIGINT)
         self.px4 = None
         try:
-            self.camera.new_frame.disconnect()
-        except RuntimeError or AttributeError: # Already disconnected
-            pass
-        self.camera = None
+            try:
+                self.camera.new_frame.disconnect()
+            except RuntimeError: # Already disconnected
+                pass
+            self.camera.stop()
+            self.camera = None
+        except AttributeError:
+            pass                # Already None
         self.ui.comboBox_alg.setEnabled(True)
         self.ui.tabWidget.setCurrentIndex(0)
         self.ui.tabWidget.setTabEnabled(1, False)
+
+    def experiment_stopped(self):
+        self.ui.label_exp_i.setText("-")
+        self.ui.label_exp_N.setText("-")
 
     def run_mission(self):
         if not self.ui.textBox_nazev_mise.toPlainText():
@@ -295,7 +304,10 @@ class Missions(qtw.QMainWindow):
             'PX4_SYS_AUTOSTART': self.cfg["px4_sys_autostart"],
             'PX4_GZ_MODEL': self.cfg["gz_model"],
             'PX4_GZ_WORLD': self.ui.textBox_nazev_mise.toPlainText(),
-            'PX4_GZ_MODEL_POSE': " ".join((str(self.ui.uav_x.value()), str(self.ui.uav_y.value()), "0.2", "0", "0", str(self.ui.uav_phi.value())))
+            'PX4_GZ_MODEL_POSE': " ".join((str(self.ui.uav_x.value()), str(self.ui.uav_y.value()), "0.25", "0", "0", str(self.ui.uav_phi.value()))),
+            'PX4_HOME_LAT': str(self.cfg["origin"]["lat_deg"]),
+            'PX4_HOME_LON': str(self.cfg["origin"]["lon_deg"]),
+            'PX4_HOME_ALT': str(self.cfg["origin"]["elevation"])
         }
 
         self.update_sdf_with_mission(self.ui.textBox_nazev_mise.toPlainText()+".sdf")
@@ -336,6 +348,8 @@ class Missions(qtw.QMainWindow):
 
     def run_mission_from_experiment(self, name):
         self.ui.textBox_nazev_mise.setPlainText(name)
+        self.ui.label_exp_i.setText(str(self.experiment_runner.i))
+        self.ui.label_exp_N.setText(str(self.experiment_runner.N))
         self.load_mission()
         self.run_stop_mission()
 
@@ -393,6 +407,14 @@ class Missions(qtw.QMainWindow):
 
         world = root.find(".//world")
         world.set("name", mission["nazev"])
+
+        coordinates = world.find("./spherical_coordinates")
+        lat = coordinates.find("./latitude_deg")
+        lon = coordinates.find("./longitude_deg")
+        elev = coordinates.find("./elevation")
+        lat.text = str(self.cfg["origin"]["lat_deg"])
+        lon.text = str(self.cfg["origin"]["lon_deg"])
+        elev.text = str(self.cfg["origin"]["elevation"])
 
         tree.write(os.path.join(self.cfg["gz_worlds_dir"], output_file))
 
@@ -529,14 +551,15 @@ class ExperimentModel(qtc.QAbstractTableModel):
         if role == Qt.DisplayRole and orientation == Qt.Orientation.Horizontal:
             if section == len(self.columns):
                 return "N" # last column is the number of times the mission should be run
-            try:
-                current = self.columns[section]
-                previous = self.columns[section-1]
-                current_split = current.split('.')
-                if current_split[0] == previous.split('.')[0]:
-                    return "."+current_split[-1]
-            except IndexError:
-                pass
+            current = self.columns[section]
+            # try:
+            #     previous = self.columns[section-1]
+            #     current_split = current.split('.')
+            #     previous_split = previous.split('.')
+            #     if previous not in self.cfg["exclude_mission_columns_in_experiment_table"] and current_split[0] == previous_split[0]:
+            #         return "."+current_split[-1]
+            # except IndexError:
+            #     pass
             return current
         return super().headerData(section, orientation, role)
 

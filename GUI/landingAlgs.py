@@ -1,4 +1,8 @@
 from math import atan, radians, tan, pi
+import math
+import random
+
+import numpy as np
 from gzUAVPose import gzUAVPose
 pipul = pi/2
 from mavsdk import System
@@ -23,7 +27,8 @@ from grpc._channel import _MultiThreadedRendezvous
 
 from simple_pid import PID
 
-earth_circumference = 40074155.8892
+from geopy.distance import distance
+from geopy.point import Point
 
 class LAMeta(type(qtc.QObject), type(ABC)):
     pass
@@ -45,10 +50,17 @@ class landingAlg(ABC, qtc.QObject, metaclass=LAMeta):
     def log_state_transition(self, target_state_i):
         self.state_transitions.append(stateTransition(self.state.i, target_state_i, self.clock.time.sim, self.UAVPose.pose))
 
+    def add_relative_distance(self, latitude, longitude, altitude, distance_north, distance_east):
+        current_location = Point(latitude, longitude, altitude)
+        north_destination = distance(meters=distance_north).destination(current_location, 0)
+        east_destination = distance(meters=distance_east).destination(north_destination, 90)
+        
+        return east_destination.latitude, east_destination.longitude
+
 class AlgsModel(qtc.QAbstractListModel):
     def __init__(self, cfg, algsList: list[landingAlg] | None = None):
         super().__init__()
-        self.list = algsList or [TakeoffAndLand(cfg), TakeoffAndLand(cfg, "Vzleť a Přistaň 3m", h=3), mavlink_test(cfg), OffboardPID(cfg, name="P0.5"), OffboardPID(cfg, name="P0.8 I0.01", k_p=0.8, k_i=0.01), OffboardPID(cfg, name="P2 I0.2", k_p=2, k_i=0.2)]
+        self.list = algsList or [FixMeasurement(cfg), EstimateMeasurementCovariance(cfg, N=500), EstimateCovariance(cfg, N=200), TakeoffAndLand(cfg), TakeoffAndLand(cfg, "Vzleť a Přistaň 3m", h=3), mavlink_test(cfg), OffboardPID(cfg, name="P0.5"), OffboardPID(cfg, name="P0.8 I0.01", k_p=0.8, k_i=0.01), OffboardPID(cfg, name="P2 I0.2", k_p=2, k_i=0.2)]
 
     def data(self, index, role):
         if role == Qt.DisplayRole:
@@ -304,8 +316,7 @@ class OffboardPID(landingAlg, qtc.QObject):
             home_lat_deg = terrain_info.latitude_deg
             home_lon_deg = terrain_info.longitude_deg
             break
-        pl_lat_deg = home_lat_deg + (self.uav_pl_rel_y*360)/earth_circumference
-        pl_lon_deg = home_lon_deg + (self.uav_pl_rel_x*360)/earth_circumference
+        pl_lat_deg, pl_lon_deg = self.add_relative_distance(home_lat_deg, home_lon_deg, absolute_altitude, self.uav_pl_rel_y, self.uav_pl_rel_x)
 
         h = self.cfg["uav_h"]
 
@@ -633,3 +644,598 @@ class TakeoffAndLand(landingAlg, qtc.QObject):
         self.stepTimer.blockSignals(True)
         print("-- Landed.")
         await self.stop()
+
+
+class EstimateCovariance(landingAlg, qtc.QObject):
+    ended = qtc.Signal(MissionResult)
+    def __init__(self, cfg, name = "Odhad kovariance x_0", N = 1000) -> None:
+        landingAlg.__init__(self, cfg)
+        qtc.QObject.__init__(self)
+        self.stopped = True
+        self.drone = System()
+        self.name = name
+        self.tasks = []
+        self.states = [algState(0, "preflight", self.preflightStep)        # --> 0
+                      ,algState(1, "takeoff", self.takeoffStep)            # --> 1
+                      ,algState(2, "hover", self.hoverStep)                # --> 2
+                      ,algState(3, "new_position", self.new_positionStep)    # --> 3
+                      ]
+        self.state = self.states[0]
+        self.stateTransitions = [[None for s in self.states] for t in self.states]
+        self.stateTransitions[0][1] = self.trans_preflight2takeoff
+        self.stateTransitions[1][3] = self.trans_takeoff2new_position
+        self.stateTransitions[3][2] = self.trans_new_position2hover
+
+        self.N = N
+
+    @asyncSlot(dict, float, float, gzCamera)
+    async def run(self, mission, uav_pl_rel_x, uav_pl_rel_y, camera: gzCamera):
+        self.clock = gzClock()
+        self.UAVPose = gzUAVPose(self.cfg)
+        self.stopped = False
+        self.mission = mission
+        await self.drone.connect(system_address="udp://:14540")
+        async for state in self.drone.core.connection_state():
+            if state.is_connected:
+                break
+
+        self.last_t = None
+
+        self.state = self.states[0]
+
+        self.tasks.append(asyncio.ensure_future(self.subscribe_attitude()))
+        self.tasks.append(asyncio.ensure_future(self.subscribe_altitude()))
+        self.tasks.append(asyncio.ensure_future(self.subscribe_flight_mode()))
+        self.tasks.append(asyncio.ensure_future(self.subscribe_landed_state()))
+
+        self.cam = camera
+
+        self.stepTimer = qtc.QTimer()
+        self.stepTimer.timeout.connect(self.step)
+        self.stepTimer.start(100)
+
+        self.uav_pl_rel_x = uav_pl_rel_x
+        self.uav_pl_rel_y = uav_pl_rel_y
+
+        self.real_positions = []
+        self.requested_positions = []
+
+        self.i = 0
+
+    @asyncSlot(None)
+    async def step(self):
+        await self.state.step()
+
+    @asyncSlot(None)
+    async def stop(self):
+        if self.stopped:
+            return
+        self.stopped = True
+        self.clock.stop()
+        for task in self.tasks:
+            task.cancel()
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
+        self.drone = System() # reset the connection
+        self.stepTimer.stop()
+        try:
+            try:
+                self.cam.new_frame.disconnect()
+            except RuntimeError: # Already disconnected
+                pass
+            self.cam = None
+            self.ended.emit(MissionResult(self.mission, self.start_time, self.clock.time, self.UAVPose.pose, self.state_transitions, {"requested_postions": self.requested_positions, "real_positions": self.real_positions}))
+        except AttributeError as e:
+            print (e)
+
+    async def subscribe_altitude(self):
+        try:
+            async for position in self.drone.telemetry.position():
+                self.altitude = position.relative_altitude_m
+                # print(f"h = {self.altitude} m", end = "\r")
+        except _MultiThreadedRendezvous:
+            pass
+
+    async def subscribe_attitude(self):
+        try:
+            async for attitude in self.drone.telemetry.attitude_euler():
+                self.pitch_deg = attitude.pitch_deg
+                self.roll_deg = attitude.roll_deg
+                self.yaw_deg = attitude.yaw_deg
+                current_yaw = self.quat_to_yaw(self.UAVPose.pose.orientation)
+
+                print(f"Pitch: {self.pitch_deg:6.2f}, Roll: {self.roll_deg:6.2f}, Yaw: {self.yaw_deg:6.2f}, Yaw(Q): {current_yaw:6.2f}", end="\r")
+        except _MultiThreadedRendezvous:
+            pass
+
+    async def subscribe_flight_mode(self):
+        try:
+            async for flight_mode in self.drone.telemetry.flight_mode():
+                self.flight_mode = flight_mode
+        except _MultiThreadedRendezvous:
+            pass
+    async def subscribe_landed_state(self):
+        try:
+            async for state in self.drone.telemetry.landed_state():
+                self.landed_state = state
+        except _MultiThreadedRendezvous:
+            pass
+
+    async def preflightStep(self):
+        self.stepTimer.blockSignals(True)
+        async for health in self.drone.telemetry.health():
+            if health.is_global_position_ok and health.is_home_position_ok:
+                break
+            else:
+                self.stepTimer.blockSignals(False)
+                return
+            
+        print("-- Global position state is good enough for flying.")
+        await self.trans_preflight2takeoff()
+        self.stepTimer.blockSignals(False)
+
+    async def trans_preflight2takeoff(self):
+        new_state = self.states[1]
+        print(f"-- Switching the state from {self.state.name} to {new_state.name}")
+        print("-- Arming")
+        retry = True
+        delay = 2
+        while retry:
+            try:
+                await self.drone.action.arm()
+                retry = False
+            except ActionError as e:
+                print(e)
+                print("   Retrying in", delay)
+                await asyncio.sleep(delay)
+                delay *= 1.5
+
+        async for terrain_info in self.drone.telemetry.home():
+            absolute_altitude = terrain_info.absolute_altitude_m
+            break
+
+        print("-- Taking off")
+        # await self.drone.action.set_takeoff_altitude(10.0)
+        # await self.drone.action.takeoff()
+
+        x = self.UAVPose.pose.position.x
+        y = self.UAVPose.pose.position.y    
+        yaw = 90
+
+        lat_deg, lon_deg = self.add_relative_distance(self.cfg["origin"]["lat_deg"], self.cfg["origin"]["lon_deg"], self.cfg["origin"]["elevation"], y, x)
+        try:
+            await self.drone.action.goto_location(lat_deg, lon_deg, 10.0+absolute_altitude, yaw)
+        except ActionError as e:
+            print(e)                                # TODO: handle error
+
+
+        self.start_time = self.clock.time
+
+        self.log_state_transition(new_state.i)
+        self.state = new_state
+        print(f"-- State switched to {new_state.name}")
+
+    async def takeoffStep(self):
+        # if not self.landed_state == LandedState.IN_AIR:
+        #     return
+        if not self.altitude > 9.5:
+            return
+        self.stepTimer.blockSignals(True)
+        await self.trans_takeoff2new_position()
+        self.stepTimer.blockSignals(False)
+
+    async def trans_takeoff2new_position(self):
+        await self.trans2new_position()
+
+    def random_point(self):
+        angle = random.uniform(0, 2 * math.pi)
+
+        yaw = random.uniform(-180, 180)
+        
+        x = 10 * math.cos(angle)
+        y = 10 * math.sin(angle)
+        h = self.cfg["uav_h"]
+        
+        return (x, y, h, yaw)
+
+    async def trans2new_position(self):
+        new_state = self.states[3]
+        print(f"-- Switching the state from {self.state.name} to {new_state.name}")
+        self.log_state_transition(new_state.i)
+        self.state = new_state
+        print(f"-- State switched to {new_state.name}")
+
+        async for terrain_info in self.drone.telemetry.home():
+            absolute_altitude = terrain_info.absolute_altitude_m
+            break
+
+        new_point_rel_x, new_point_rel_y, h, new_point_yaw = self.random_point()   
+        x = self.UAVPose.pose.position.x + new_point_rel_x
+        y = self.UAVPose.pose.position.y + new_point_rel_y        
+        yaw = new_point_yaw
+        self.requested_positions.append((x, y, h, yaw))
+
+        lat_deg, lon_deg = self.add_relative_distance(self.cfg["origin"]["lat_deg"], self.cfg["origin"]["lon_deg"], self.cfg["origin"]["elevation"], y, x)
+
+        print(f"-- Flying over to the target {h} m above the ground.")
+        try:
+            await self.drone.action.goto_location(lat_deg, lon_deg, h+absolute_altitude, yaw)
+        except ActionError as e:
+            print(e)                                # TODO: handle error
+
+        while not self.clock.start_timer(10.0):
+            await asyncio.sleep(0.1)
+        self.clock.time_elapsed.connect(self.new_positionClockStep)
+
+    async def hoverStep(self):
+        self.stepTimer.blockSignals(True)
+        await self.trans_hover2new_position()
+
+    @asyncSlot(None)
+    async def new_positionClockStep(self):
+        self.clock.time_elapsed.disconnect()
+        await self.trans_new_position2hover()
+        self.stepTimer.blockSignals(False)
+
+    async def new_positionStep(self):
+        pass
+
+    async def trans_new_position2hover(self):
+        new_state = self.states[2]
+        print(f"-- Switching the state from {self.state.name} to {new_state.name}")
+        self.log_state_transition(new_state.i)
+        self.state = new_state
+        print(f"-- State switched to {new_state.name}")
+
+        x = self.UAVPose.pose.position.x
+        y = self.UAVPose.pose.position.y
+        z = self.UAVPose.pose.position.z
+        yaw = self.quat_to_yaw(self.UAVPose.pose.orientation)
+        self.real_positions.append((x, y, z, yaw))
+
+        self.i += 1
+        print(f"-- Measured position {self.i}/{self.N}")
+        if self.i >= self.N:
+            await self.stop()
+
+    async def trans_hover2new_position(self):
+        await self.trans2new_position()
+
+    def quat_to_yaw(self, q):
+        yaw = (270 - math.degrees(math.atan2(2.0 * (q.z * q.w + q.x * q.y) , - 1.0 + 2.0 * (q.w * q.w + q.x * q.x))))%360 - 180
+        return yaw
+    
+class EstimateMeasurementCovariance(landingAlg, qtc.QObject):
+    ended = qtc.Signal(MissionResult)
+    def __init__(self, cfg, name = "Odhad kovariance x_k", N = 1000) -> None:
+        landingAlg.__init__(self, cfg)
+        qtc.QObject.__init__(self)
+        self.stopped = True
+        self.drone = System()
+        self.name = name
+        self.tasks = []
+        self.states = [algState(0, "preflight", self.preflightStep)        # --> 0
+                      ,algState(1, "takeoff", self.takeoffStep)            # --> 1
+                      ,algState(2, "hover", self.hoverStep)                # --> 2
+                      ,algState(3, "new_position", self.new_positionStep)    # --> 3
+                      ]
+        self.state = self.states[0]
+        self.stateTransitions = [[None for s in self.states] for t in self.states]
+        self.stateTransitions[0][1] = self.trans_preflight2takeoff
+        self.stateTransitions[1][3] = self.trans_takeoff2new_position
+        self.stateTransitions[3][2] = self.trans_new_position2hover
+
+        self.N = N
+
+    @asyncSlot(dict, float, float, gzCamera)
+    async def run(self, mission, uav_pl_rel_x, uav_pl_rel_y, camera: gzCamera):
+        self.clock = gzClock()
+        self.UAVPose = gzUAVPose(self.cfg)
+        self.stopped = False
+        self.mission = mission
+        await self.drone.connect(system_address="udp://:14540")
+        async for state in self.drone.core.connection_state():
+            if state.is_connected:
+                break
+
+        self.last_t = None
+
+        self.state = self.states[0]
+
+        self.tasks.append(asyncio.ensure_future(self.subscribe_attitude()))
+        self.tasks.append(asyncio.ensure_future(self.subscribe_altitude()))
+        self.tasks.append(asyncio.ensure_future(self.subscribe_flight_mode()))
+        self.tasks.append(asyncio.ensure_future(self.subscribe_landed_state()))
+
+        self.cam = camera
+
+        self.stepTimer = qtc.QTimer()
+        self.stepTimer.timeout.connect(self.step)
+        self.stepTimer.start(100)
+
+        self.uav_pl_rel_x = uav_pl_rel_x
+        self.uav_pl_rel_y = uav_pl_rel_y
+
+        self.real_positions = []
+        self.measured_positions = []
+
+    @asyncSlot(None)
+    async def step(self):
+        await self.state.step()
+
+    @asyncSlot(None)
+    async def stop(self):
+        if self.stopped:
+            return
+        self.stopped = True
+        self.clock.stop()
+        for task in self.tasks:
+            task.cancel()
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
+        self.drone = System() # reset the connection
+        self.stepTimer.stop()
+        try:
+            try:
+                self.cam.new_frame.disconnect()
+            except RuntimeError: # Already disconnected
+                pass
+            self.cam = None
+            self.ended.emit(MissionResult(self.mission, self.start_time, self.clock.time, self.UAVPose.pose, self.state_transitions, {"measured_postions": self.measured_positions, "real_positions": self.real_positions}))
+        except AttributeError as e:
+            print (e)
+
+    async def subscribe_altitude(self):
+        try:
+            async for position in self.drone.telemetry.position():
+                self.altitude = position.relative_altitude_m
+                # print(f"h = {self.altitude} m", end = "\r")
+        except _MultiThreadedRendezvous:
+            pass
+
+    async def subscribe_attitude(self):
+        try:
+            async for attitude in self.drone.telemetry.attitude_euler():
+                self.pitch_deg = attitude.pitch_deg
+                self.roll_deg = attitude.roll_deg
+                self.yaw_deg = attitude.yaw_deg
+                current_yaw = self.quat_to_yaw(self.UAVPose.pose.orientation)
+
+                print(f"Pitch: {self.pitch_deg:6.2f}, Roll: {self.roll_deg:6.2f}, Yaw: {self.yaw_deg:6.2f}, Yaw(Q): {current_yaw:6.2f}", end="\r")
+        except _MultiThreadedRendezvous:
+            pass
+
+    async def subscribe_flight_mode(self):
+        try:
+            async for flight_mode in self.drone.telemetry.flight_mode():
+                self.flight_mode = flight_mode
+        except _MultiThreadedRendezvous:
+            pass
+    async def subscribe_landed_state(self):
+        try:
+            async for state in self.drone.telemetry.landed_state():
+                self.landed_state = state
+        except _MultiThreadedRendezvous:
+            pass
+
+    async def preflightStep(self):
+        self.stepTimer.blockSignals(True)
+        async for health in self.drone.telemetry.health():
+            if health.is_global_position_ok and health.is_home_position_ok:
+                break
+            else:
+                self.stepTimer.blockSignals(False)
+                return
+            
+        print("-- Global position state is good enough for flying.")
+        await self.trans_preflight2takeoff()
+        self.stepTimer.blockSignals(False)
+
+    async def trans_preflight2takeoff(self):
+        new_state = self.states[1]
+        print(f"-- Switching the state from {self.state.name} to {new_state.name}")
+        print("-- Arming")
+        retry = True
+        delay = 2
+        while retry:
+            try:
+                await self.drone.action.arm()
+                retry = False
+            except ActionError as e:
+                print(e)
+                print("   Retrying in", delay)
+                await asyncio.sleep(delay)
+                delay *= 1.5
+
+        async for terrain_info in self.drone.telemetry.home():
+            absolute_altitude = terrain_info.absolute_altitude_m
+            break
+
+        print("-- Taking off")
+        # await self.drone.action.set_takeoff_altitude(10.0)
+        # await self.drone.action.takeoff()
+
+        x = self.UAVPose.pose.position.x
+        y = self.UAVPose.pose.position.y    
+        yaw = 90
+
+        lat_deg, lon_deg = self.add_relative_distance(self.cfg["origin"]["lat_deg"], self.cfg["origin"]["lon_deg"], self.cfg["origin"]["elevation"], y, x)
+        try:
+            await self.drone.action.goto_location(lat_deg, lon_deg, 10.0+absolute_altitude, yaw)
+        except ActionError as e:
+            print(e)                                # TODO: handle error
+
+
+        self.start_time = self.clock.time
+
+        self.log_state_transition(new_state.i)
+        self.state = new_state
+        print(f"-- State switched to {new_state.name}")
+
+    async def takeoffStep(self):
+        # if not self.landed_state == LandedState.IN_AIR:
+        #     return
+        if not self.altitude > 9.5:
+            return
+        self.stepTimer.blockSignals(True)
+        await self.trans_takeoff2new_position()
+        self.stepTimer.blockSignals(False)
+
+    async def trans_takeoff2new_position(self):
+        await self.trans2new_position()
+
+    def random_point(self):
+        angle = random.uniform(0, 2 * math.pi)
+
+        yaw = random.uniform(-180, 180)
+        
+        h = random.uniform(0.5, 11)
+
+        a = 0.35 * h
+        x = a * math.cos(angle)
+        y = a * math.sin(angle)
+        
+        return (x, y, h, yaw)
+
+    async def trans2new_position(self):
+        new_state = self.states[3]
+        print(f"-- Switching the state from {self.state.name} to {new_state.name}")
+        self.log_state_transition(new_state.i)
+        self.state = new_state
+        print(f"-- State switched to {new_state.name}")
+
+        async for terrain_info in self.drone.telemetry.home():
+            absolute_altitude = terrain_info.absolute_altitude_m
+            break
+
+        new_point_rel_x, new_point_rel_y, h, new_point_yaw = self.random_point()   
+        x = self.mission["plosina"]["x"] + new_point_rel_x
+        y = self.mission["plosina"]["y"] + new_point_rel_y        
+        yaw = new_point_yaw
+
+        lat_deg, lon_deg = self.add_relative_distance(self.cfg["origin"]["lat_deg"], self.cfg["origin"]["lon_deg"], self.cfg["origin"]["elevation"], y, x)
+
+        print(f"-- Flying over to the target {h} m above the ground.")
+        try:
+            await self.drone.action.goto_location(lat_deg, lon_deg, h+absolute_altitude, yaw)
+        except ActionError as e:
+            print(e)                                # TODO: handle error
+
+        while not self.clock.start_timer(5.0):
+            await asyncio.sleep(0.1)
+        self.clock.time_elapsed.connect(self.new_positionClockStep)
+        self.cam.new_frame.connect(self.new_positionCameraStep)
+
+    async def hoverStep(self):
+        self.stepTimer.blockSignals(True)
+        await self.trans_hover2new_position()
+
+    @asyncSlot(None)
+    async def new_positionClockStep(self):
+        self.clock.time_elapsed.disconnect()
+        await self.trans_new_position2hover()
+        self.stepTimer.blockSignals(False)
+
+    def compute_heading(self, roll, pitch, yaw):
+        # Convert angles to radians
+        roll_rad = math.radians(roll)
+        pitch_rad = math.radians(pitch)
+        yaw_rad = math.radians(yaw)
+
+        # Compute heading (rotation in ground plane)
+        heading_rad = yaw_rad + math.atan2(math.sin(roll_rad) * math.sin(yaw_rad), 
+                                        math.cos(roll_rad)) * math.cos(yaw_rad)
+
+        # Convert heading to degrees
+        heading_deg = math.degrees(heading_rad)
+
+        # Normalize heading to be within [0, 360) degrees
+        heading_deg = (heading_deg + 180) % 360 - 180
+
+        return heading_deg
+    
+    def rotate_point(self, x, y, yaw):
+        # Convert yaw angle to radians
+        yaw_rad = np.radians(yaw)
+        
+        # Create rotation matrix
+        R = np.array([[np.cos(yaw_rad), -np.sin(yaw_rad)],
+                    [np.sin(yaw_rad), np.cos(yaw_rad)]])
+        
+        # Create a column vector representing the original point
+        point = np.array([[x], [y]])
+        
+        # Rotate the point using matrix multiplication
+        rotated_point = np.dot(R, point)
+        
+        # Extract the rotated coordinates
+        rotated_x = rotated_point[0, 0]
+        rotated_y = rotated_point[1, 0]
+        
+        return rotated_x, rotated_y
+
+    @asyncSlot(object, object, object, object, float, qtg.QImage)
+    async def new_positionCameraStep(self, x, y, z, yaw, t, frame):
+        if x is None:
+            return
+        if random.uniform(0,1) <= 0.95: # take only 5% of images
+            return
+        
+        yaw = (-yaw - 90 + 180)%360-180
+        x = +self.altitude * tan(pipul - atan(z/x) - radians(self.roll_deg))
+        y = -self.altitude * tan(pipul - atan(z/y) - radians(self.pitch_deg))
+        x, y = self.rotate_point(x, y, -self.compute_heading(self.roll_deg, self.pitch_deg, yaw))
+        x = self.mission["plosina"]["x"] - x
+        y = self.mission["plosina"]["y"] - y
+        z = self.altitude + self.cfg["camera"]["height_offset"]
+        
+
+        self.measured_positions.append((float(x), float(y), float(z), float(yaw)))
+
+        x = self.UAVPose.pose.position.x
+        y = self.UAVPose.pose.position.y
+        z = self.UAVPose.pose.position.z
+        yaw = self.quat_to_yaw(self.UAVPose.pose.orientation)
+        self.real_positions.append((x, y, z, yaw))
+        
+        i = len(self.measured_positions)
+        print(f"-- Measured position {i}/{self.N}")
+        if i >= self.N:
+            await self.stop()
+
+    async def new_positionStep(self):
+        pass
+
+    async def trans_new_position2hover(self):
+        new_state = self.states[2]
+        print(f"-- Switching the state from {self.state.name} to {new_state.name}")
+        self.log_state_transition(new_state.i)
+        self.state = new_state
+        print(f"-- State switched to {new_state.name}")
+
+    async def trans_hover2new_position(self):
+        await self.trans2new_position()
+
+    def quat_to_yaw(self, q):
+        yaw = (270 - math.degrees(math.atan2(2.0 * (q.z * q.w + q.x * q.y) , - 1.0 + 2.0 * (q.w * q.w + q.x * q.x))))%360 - 180
+        return yaw
+    
+class FixMeasurement(EstimateMeasurementCovariance):
+    def __init__(self, cfg, name="Oprava mereni kamerou", N=400) -> None:
+        super().__init__(cfg, name, N)
+        self.p_i = 0
+        self.points = [[2, 2], [2, -2], [-2, -2], [-2, 2]]
+
+    def random_point(self):
+        # yaw = random.uniform(-180, 180)
+        yaw = 90
+        h = 6
+        x, y = tuple(self.points[self.p_i])
+        self.p_i+=1
+        self.p_i%=4
+        
+        return (x, y, h, yaw)
