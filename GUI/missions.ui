@@ -27,7 +27,7 @@
      </rect>
     </property>
     <property name="currentIndex">
-     <number>2</number>
+     <number>0</number>
     </property>
     <property name="documentMode">
      <bool>false</bool>
@@ -45,7 +45,7 @@
      <attribute name="title">
       <string>Mise</string>
      </attribute>
-     <widget class="QWidget" name="widget" native="true">
+     <widget class="QWidget" name="mapa" native="true">
       <property name="geometry">
        <rect>
         <x>10</x>
@@ -64,25 +64,35 @@
        <string>Mapa rozložení objektů v misi</string>
       </property>
       <property name="styleSheet">
-       <string notr="true">background: qconicalgradient(cx:0.5, cy:0.5, angle:0, stop:0 rgba(255, 255, 255, 255), stop:0.373979 rgba(255, 255, 255, 255), stop:0.373991 rgba(33, 30, 255, 255), stop:0.624018 rgba(33, 30, 255, 255), stop:0.624043 rgba(255, 0, 0, 255), stop:1 rgba(255, 0, 0, 255))</string>
+       <string notr="true">border-image : url(GUI/assets/img/borcak1.png)</string>
       </property>
       <widget class="QLabel" name="label_uav">
        <property name="geometry">
         <rect>
-         <x>60</x>
-         <y>100</y>
-         <width>67</width>
-         <height>17</height>
+         <x>70</x>
+         <y>110</y>
+         <width>15</width>
+         <height>15</height>
         </rect>
+       </property>
+       <property name="font">
+        <font>
+         <pointsize>14</pointsize>
+         <italic>false</italic>
+         <bold>false</bold>
+        </font>
        </property>
        <property name="autoFillBackground">
         <bool>false</bool>
        </property>
        <property name="styleSheet">
-        <string notr="true"/>
+        <string notr="true">border-image : none; color: white;</string>
+       </property>
+       <property name="frameShape">
+        <enum>QFrame::NoFrame</enum>
        </property>
        <property name="text">
-        <string>letadlo</string>
+        <string>✣</string>
        </property>
       </widget>
       <widget class="QLabel" name="label_tag">
@@ -90,12 +100,21 @@
         <rect>
          <x>280</x>
          <y>190</y>
-         <width>67</width>
-         <height>17</height>
+         <width>15</width>
+         <height>15</height>
         </rect>
        </property>
+       <property name="styleSheet">
+        <string notr="true">border-image: none; background-image : url(GUI/assets/img/tag.png); color: red</string>
+       </property>
+       <property name="frameShape">
+        <enum>QFrame::Panel</enum>
+       </property>
+       <property name="lineWidth">
+        <number>1</number>
+       </property>
        <property name="text">
-        <string>plošina</string>
+        <string/>
        </property>
        <property name="buddy">
         <cstring>pl_x</cstring>
@@ -142,13 +161,13 @@
         <number>1</number>
        </property>
        <property name="minimum">
-        <double>-25.000000000000000</double>
+        <double>-100.000000000000000</double>
        </property>
        <property name="maximum">
-        <double>25.000000000000000</double>
+        <double>100.000000000000000</double>
        </property>
        <property name="singleStep">
-        <double>0.100000000000000</double>
+        <double>0.500000000000000</double>
        </property>
        <property name="stepType">
         <enum>QAbstractSpinBox::AdaptiveDecimalStepType</enum>
@@ -223,13 +242,13 @@
         <number>1</number>
        </property>
        <property name="minimum">
-        <double>-25.000000000000000</double>
+        <double>-100.000000000000000</double>
        </property>
        <property name="maximum">
-        <double>25.000000000000000</double>
+        <double>100.000000000000000</double>
        </property>
        <property name="singleStep">
-        <double>0.100000000000000</double>
+        <double>0.500000000000000</double>
        </property>
        <property name="stepType">
         <enum>QAbstractSpinBox::AdaptiveDecimalStepType</enum>
@@ -347,13 +366,13 @@
         <number>1</number>
        </property>
        <property name="minimum">
-        <double>-25.000000000000000</double>
+        <double>-100.000000000000000</double>
        </property>
        <property name="maximum">
-        <double>25.000000000000000</double>
+        <double>100.000000000000000</double>
        </property>
        <property name="singleStep">
-        <double>0.100000000000000</double>
+        <double>0.500000000000000</double>
        </property>
        <property name="stepType">
         <enum>QAbstractSpinBox::AdaptiveDecimalStepType</enum>
@@ -428,13 +447,13 @@
         <number>1</number>
        </property>
        <property name="minimum">
-        <double>-25.000000000000000</double>
+        <double>-100.000000000000000</double>
        </property>
        <property name="maximum">
-        <double>25.000000000000000</double>
+        <double>100.000000000000000</double>
        </property>
        <property name="singleStep">
-        <double>0.100000000000000</double>
+        <double>0.500000000000000</double>
        </property>
        <property name="stepType">
         <enum>QAbstractSpinBox::AdaptiveDecimalStepType</enum>
@@ -564,7 +583,7 @@
         <enum>QAbstractSpinBox::AdaptiveDecimalStepType</enum>
        </property>
        <property name="value">
-        <double>22.000000000000000</double>
+        <double>0.000000000000000</double>
        </property>
       </widget>
       <widget class="QLabel" name="label_7">
@@ -645,7 +664,7 @@
         <enum>QAbstractSpinBox::AdaptiveDecimalStepType</enum>
        </property>
        <property name="value">
-        <double>22.000000000000000</double>
+        <double>0.000000000000000</double>
        </property>
       </widget>
       <widget class="QDoubleSpinBox" name="vitr_phi">
@@ -825,7 +844,7 @@
         <enum>QAbstractSpinBox::AdaptiveDecimalStepType</enum>
        </property>
        <property name="value">
-        <double>200.000000000000000</double>
+        <double>70.000000000000000</double>
        </property>
       </widget>
       <widget class="QLabel" name="label_11">
@@ -906,7 +925,7 @@
         <enum>QAbstractSpinBox::AdaptiveDecimalStepType</enum>
        </property>
        <property name="value">
-        <double>3.000000000000000</double>
+        <double>0.000000000000000</double>
        </property>
       </widget>
       <widget class="QDoubleSpinBox" name="pl_stin_sklon">
@@ -1124,6 +1143,9 @@
      </widget>
     </widget>
     <widget class="QWidget" name="tab_zive">
+     <property name="enabled">
+      <bool>false</bool>
+     </property>
      <attribute name="title">
       <string>Živě</string>
      </attribute>
@@ -1476,6 +1498,18 @@
   <tabstop>but_load</tabstop>
   <tabstop>but_delete</tabstop>
   <tabstop>but_start</tabstop>
+  <tabstop>textBox_nazev_experimentu</tabstop>
+  <tabstop>but_save_experiment</tabstop>
+  <tabstop>list_experimenty</tabstop>
+  <tabstop>but_load_experiment</tabstop>
+  <tabstop>but_delete_experiment</tabstop>
+  <tabstop>but_start_experiment</tabstop>
+  <tabstop>table_experiment</tabstop>
+  <tabstop>but_remove_mise</tabstop>
+  <tabstop>but_remove_all</tabstop>
+  <tabstop>list_mise_2</tabstop>
+  <tabstop>but_add_mise</tabstop>
+  <tabstop>but_add_all</tabstop>
  </tabstops>
  <resources/>
  <connections/>
