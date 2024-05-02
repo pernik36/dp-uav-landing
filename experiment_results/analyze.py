@@ -42,7 +42,6 @@ class CovarianceEstimationMission(Mission):
         return new
 
     def print_comparison(self):
-        print(f"Mission: {self.data['mission_definition']['nazev']}")
         for requested, real, difference in zip(self.requested_positions, self.real_positions, self.differences):
             print("Requested Position: ", end="")
             self._print_numbers(requested)
@@ -79,7 +78,8 @@ class CovarianceEstimationMission(Mission):
         print(covariance_matrix)
 
     def analyze(self):
-        self.print_comparison()
+        print(f"Mission: {self.data['mission_definition']['nazev']}")
+        # self.print_comparison()
         self.print_statistics()
         self.plot_histograms()
 
@@ -101,7 +101,6 @@ class MeasurementCovarianceEstimationMission(Mission):
         return new
 
     def print_comparison(self):
-        print(f"Mission: {self.data['mission_definition']['nazev']}")
         for requested, real, difference in zip(self.measured_positions, self.real_positions, self.differences):
             print("Measured Position: ", end="")
             self._print_numbers(requested)
@@ -149,7 +148,8 @@ class MeasurementCovarianceEstimationMission(Mission):
         print(covariance_matrix)
 
     def analyze(self):
-        self.print_comparison()
+        print(f"Mission: {self.data['mission_definition']['nazev']}")
+        # self.print_comparison()
         self.print_statistics()
         self.plot_histograms()
         self.plot_measurements_real()
