@@ -10,6 +10,7 @@ from PySide6 import QtWidgets as qtw
 from PySide6 import QtGui as qtg
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QWidget
+import numpy as np
 import psutil
 
 from qasync import QEventLoop, QApplication, asyncClose, asyncSlot
@@ -276,7 +277,7 @@ class Missions(qtw.QMainWindow):
     def stop_mission(self):
         for proc in psutil.process_iter():
             if "ruby" in proc.name() or "px4" in proc.name():
-                proc.send_signal(signal.SIGINT)
+                proc.send_signal(signal.SIGKILL)
         self.px4 = None
         try:
             try:
@@ -308,6 +309,7 @@ class Missions(qtw.QMainWindow):
             'PX4_HOME_LAT': str(self.cfg["origin"]["lat_deg"]),
             'PX4_HOME_LON': str(self.cfg["origin"]["lon_deg"]),
             'PX4_HOME_ALT': str(self.cfg["origin"]["elevation"])
+            #,'HEADLESS': str(self.cfg["headless"])
         }
 
         self.update_sdf_with_mission(self.ui.textBox_nazev_mise.toPlainText()+".sdf")
@@ -376,7 +378,7 @@ class Missions(qtw.QMainWindow):
 
         include = root.find(".//include")           # umisteni tagu
         pose_element = include.find("pose")
-        pose_x = mission['plosina']['x']
+        pose_x = mission['plosina']['x'] - mission["plosina"]["a"]/200.0
         pose_y = mission['plosina']['y']
         pose_yaw = mission['plosina']['phi']
         pose_values = f"{pose_x} {pose_y} 0 0 1.57 {pose_yaw}"
@@ -415,6 +417,18 @@ class Missions(qtw.QMainWindow):
         lat.text = str(self.cfg["origin"]["lat_deg"])
         lon.text = str(self.cfg["origin"]["lon_deg"])
         elev.text = str(self.cfg["origin"]["elevation"])
+
+        sun = root.find(".//light[@name='sun']")
+        sun.find("./direction").text = " ".join([str(d) for d in self.cfg["sun_direction"]])
+
+        shade = root.find(".//model[@name='shade']")
+        if mission["plosina"]["stin"]>0:
+            shade_x = pose_x + ((mission["plosina"]["stin"]/100 - 1) * (mission["plosina"]["a"]/100) * math.copysign(1,float(self.cfg["sun_direction"][0])))
+            shade_y = pose_y
+            shade_xyz = np.array([shade_x, shade_y, -2.5]) - 400*np.array(self.cfg["sun_direction"])
+            shade.find("pose").text = f"{shade_xyz[0]} {shade_xyz[1]} {shade_xyz[2]} 0 0 {math.radians(mission['plosina']['stin_sklon'])}"
+        else:
+            world.remove(shade)
 
         tree.write(os.path.join(self.cfg["gz_worlds_dir"], output_file))
 

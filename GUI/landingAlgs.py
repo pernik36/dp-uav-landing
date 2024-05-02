@@ -7,7 +7,7 @@ from gzUAVPose import gzUAVPose
 pipul = pi/2
 from mavsdk import System
 from mavsdk.action import ActionError
-from mavsdk.telemetry import LandedState, FlightMode
+from mavsdk.telemetry import LandedState, FlightMode, TelemetryError
 from mavsdk.offboard import (OffboardError, VelocityBodyYawspeed)
 
 from PySide6 import QtCore as qtc
@@ -29,6 +29,8 @@ from simple_pid import PID
 
 from geopy.distance import distance
 from geopy.point import Point
+
+from filterpy.kalman import KalmanFilter
 
 class LAMeta(type(qtc.QObject), type(ABC)):
     pass
@@ -60,7 +62,7 @@ class landingAlg(ABC, qtc.QObject, metaclass=LAMeta):
 class AlgsModel(qtc.QAbstractListModel):
     def __init__(self, cfg, algsList: list[landingAlg] | None = None):
         super().__init__()
-        self.list = algsList or [FixMeasurement(cfg), EstimateMeasurementCovariance(cfg, N=500), EstimateCovariance(cfg, N=200), TakeoffAndLand(cfg), TakeoffAndLand(cfg, "Vzleť a Přistaň 3m", h=3), mavlink_test(cfg), OffboardPID(cfg, name="P0.5"), OffboardPID(cfg, name="P0.8 I0.01", k_p=0.8, k_i=0.01), OffboardPID(cfg, name="P2 I0.2", k_p=2, k_i=0.2)]
+        self.list = algsList or [KalmanOffboardPID(cfg), FixMeasurement(cfg), EstimateMeasurementCovariance(cfg, N=400), EstimateCovariance(cfg, N=200), TakeoffAndLand(cfg), TakeoffAndLand(cfg, "Vzleť a Přistaň 3m", h=3), mavlink_test(cfg), OffboardPID(cfg, name="P0.5"), OffboardPID(cfg, name="P0.8 I0.01", k_p=0.8, k_i=0.01), OffboardPID(cfg, name="P2 I0.2", k_p=2, k_i=0.2)]
 
     def data(self, index, role):
         if role == Qt.DisplayRole:
@@ -172,6 +174,15 @@ class OffboardPID(landingAlg, qtc.QObject):
 
     @asyncSlot(dict, float, float, gzCamera)
     async def run(self, mission, uav_pl_rel_x, uav_pl_rel_y, camera: gzCamera):
+        await self.run_preparation(mission, uav_pl_rel_x, uav_pl_rel_y, camera)
+        self.start_timer()
+
+    def start_timer(self):
+        self.stepTimer = qtc.QTimer()
+        self.stepTimer.timeout.connect(self.step)
+        self.stepTimer.start(100)
+
+    async def run_preparation(self, mission, uav_pl_rel_x, uav_pl_rel_y, camera: gzCamera):
         self.clock = gzClock()
         self.UAVPose = gzUAVPose(self.cfg)
         self.stopped = False
@@ -185,6 +196,13 @@ class OffboardPID(landingAlg, qtc.QObject):
 
         self.state = self.states[0]
 
+        try:
+            await self.drone.telemetry.set_rate_attitude(60)
+            await self.drone.telemetry.set_rate_position(60)
+        except TelemetryError as e:
+            print("-- Failed to set update rates.")
+            print(e)
+
         self.tasks.append(asyncio.ensure_future(self.subscribe_attitude()))
         self.tasks.append(asyncio.ensure_future(self.subscribe_altitude()))
         self.tasks.append(asyncio.ensure_future(self.subscribe_flight_mode()))
@@ -192,16 +210,13 @@ class OffboardPID(landingAlg, qtc.QObject):
 
         self.cam = camera
 
-        self.stepTimer = qtc.QTimer()
-        self.stepTimer.timeout.connect(self.step)
-        self.stepTimer.start(100)
-
         self.uav_pl_rel_x = uav_pl_rel_x
         self.uav_pl_rel_y = uav_pl_rel_y
 
         self.pid_p.set_auto_mode(False)
         self.pid_r.set_auto_mode(False)
         self.pid_y.set_auto_mode(False)
+
 
     @asyncSlot(None)
     async def step(self):
@@ -328,7 +343,7 @@ class OffboardPID(landingAlg, qtc.QObject):
 
         try:
             async for position in self.drone.telemetry.position():
-                if abs(position.latitude_deg - pl_lat_deg) < 0.000045 and abs(position.longitude_deg - pl_lon_deg) < 0.000045: # cca 5m
+                if abs(position.latitude_deg - pl_lat_deg) < 0.000009 and abs(position.longitude_deg - pl_lon_deg) < 0.000009: # cca 1m
                     break
         except _MultiThreadedRendezvous:
             pass
@@ -409,22 +424,15 @@ class OffboardPID(landingAlg, qtc.QObject):
         sp_v_d = -0.3
 
         if x is not None:
-            self.steps_wo_vis = 0
-            d_r = self.altitude * tan(pipul - atan(z/x) - radians(self.roll_deg))
-            d_p = -self.altitude * tan(pipul - atan(z/y) - radians(self.pitch_deg))
-
-            # self.last_d_r = d_r
-            # self.last_d_p = d_p
-
             dt = t - self.last_t
-            self.last_t = t
+            self.steps_wo_vis = 0
+            d_r, d_p, d_h, d_yaw = await self.relative_dist(x, y, z, yaw, t)
 
-            # sp_v_r = self.k_p * d_r
-            # sp_v_p = self.k_p * d_p
+            self.last_t = t
 
             sp_v_r = self.pid_r(-d_r, dt)
             sp_v_p = self.pid_p(-d_p, dt)
-            sp_v_d = 0.5/(1+12.0/self.altitude*(d_r*d_r + d_p*d_p))
+            sp_v_d = 0.5/(1+12.0/d_h*(d_r*d_r + d_p*d_p))
 
             print(f"v_p: {sp_v_p:6.2f}, v_r: {sp_v_r:6.2f}", end="\r")
 
@@ -434,6 +442,13 @@ class OffboardPID(landingAlg, qtc.QObject):
                 await self.trans_centering2find_target()
 
         await self.drone.offboard.set_velocity_body(VelocityBodyYawspeed(sp_v_p, sp_v_r, sp_v_d, 0.0))
+
+    async def relative_dist(self, x, y, z, yaw, t):
+        d_r = self.altitude * tan(pipul - atan(z/x) - radians(self.roll_deg))
+        d_p = -self.altitude * tan(pipul - atan(z/y) - radians(self.pitch_deg))
+        d_yaw = (-yaw - 90 + 180)%360-180
+
+        return d_r, d_p, self.altitude, d_yaw
 
     async def trans_centering2find_target(self):
         self.cam.new_frame.disconnect(self.centeringCamStep)
@@ -489,6 +504,89 @@ class OffboardPID(landingAlg, qtc.QObject):
         self.stepTimer.blockSignals(True)
         print("-- Landed.")
         await self.stop()
+
+class KalmanOffboardPID(OffboardPID):
+    def __init__(self, cfg, name="Kálmánův filtr P=0.5", k_p=0.5, k_i=0, k_d=0, P = None, Q=None, R=None) -> None:
+        """
+        * `cfg` config dictionary
+        * `name` name of the alg for UI
+        * `k_p` PID proportional gain
+        * `k_i` PID integral gain
+        * `k_d` PID derivative gain
+        * `P` state covariance
+        * `Q` process noise covariance
+        * `R` measurement noise covariance
+        """
+        super().__init__(cfg, name, k_p, k_i, k_d)
+        self.P = P if P is not None else self.cfg["kalman"]["P"]
+        self.Q = Q if Q is not None else self.cfg["kalman"]["Q"]
+        self.R = R if R is not None else self.cfg["kalman"]["R"]
+        self.F = np.array(self.cfg["kalman"]["F"])
+        self.H = np.array(self.cfg["kalman"]["H"])
+        self.kf = KalmanFilter(8, 4, 4)
+
+    async def subscribe_angular_velocity(self):
+        try:
+            async for velo in self.drone.telemetry.attitude_angular_velocity_body():
+                v_yaw = math.degrees(velo.yaw_rad_s)
+                self.a_yaw = self.v_yaw - v_yaw
+                self.v_yaw = v_yaw
+        except _MultiThreadedRendezvous:
+            pass
+
+    async def subscribe_imu(self):
+        try:
+            async for imu in self.drone.telemetry.imu():
+                self.imu = imu
+        except _MultiThreadedRendezvous:
+            pass
+
+    @asyncSlot(dict, float, float, gzCamera)
+    async def run(self, mission, uav_pl_rel_x, uav_pl_rel_y, camera: gzCamera):
+        await self.run_preparation(mission, uav_pl_rel_x, uav_pl_rel_y, camera)
+        self.v_yaw = 0
+        self.tasks.append(asyncio.ensure_future(self.subscribe_angular_velocity()))
+        self.tasks.append(asyncio.ensure_future(self.subscribe_imu()))
+        try:
+            await self.drone.telemetry.set_rate_imu(60)
+        except TelemetryError as e:
+            print("-- Failed to set IMU update rate.")
+            print(e)
+        self.set_kalman_params()
+        self.start_timer()
+
+    def set_kalman_params(self):
+        self.kf.P = np.array(self.P)
+        self.kf.Q = np.array(self.Q)
+        self.kf.R = np.array(self.R)
+        self.kf.F = np.array(self.F)
+        self.kf.H = np.array(self.H)
+
+        self.kf.x = np.array([0, 0, 0, 0, 0, 0, 0, 0])
+
+    async def relative_dist(self, x, y, z, yaw, t):
+        d_r = self.altitude * tan(pipul - atan(z/x) - radians(self.roll_deg))
+        d_p = -self.altitude * tan(pipul - atan(z/y) - radians(self.pitch_deg))
+        d_yaw = (-yaw - 90 + 180)%360-180
+        
+        accel = self.imu.acceleration_frd
+        u = np.array([accel.right_m_s2, accel.forward_m_s2, -accel.down_m_s2, self.a_yaw])
+
+        z = np.array([d_r, d_p, self.altitude, d_yaw])
+
+        self.kf.predict(u)
+        self.kf.update(z)
+
+        return self.get_filtered_state()
+    
+    def get_filtered_state(self):
+        x = self.kf.x[0]
+        y = self.kf.x[2]
+        z = self.kf.x[4]
+        yaw = self.kf.x[6]
+
+        return x, y, z, yaw
+
 
 class TakeoffAndLand(landingAlg, qtc.QObject):
     ended = qtc.Signal(MissionResult)
@@ -744,9 +842,8 @@ class EstimateCovariance(landingAlg, qtc.QObject):
                 self.pitch_deg = attitude.pitch_deg
                 self.roll_deg = attitude.roll_deg
                 self.yaw_deg = attitude.yaw_deg
-                current_yaw = self.quat_to_yaw(self.UAVPose.pose.orientation)
 
-                print(f"Pitch: {self.pitch_deg:6.2f}, Roll: {self.roll_deg:6.2f}, Yaw: {self.yaw_deg:6.2f}, Yaw(Q): {current_yaw:6.2f}", end="\r")
+                # print(f"Pitch: {self.pitch_deg:6.2f}, Roll: {self.roll_deg:6.2f}, Yaw: {self.yaw_deg:6.2f}", end="\r")
         except _MultiThreadedRendezvous:
             pass
 
@@ -1182,7 +1279,7 @@ class EstimateMeasurementCovariance(landingAlg, qtc.QObject):
     async def new_positionCameraStep(self, x, y, z, yaw, t, frame):
         if x is None:
             return
-        if random.uniform(0,1) <= 0.95: # take only 5% of images
+        if random.uniform(0,1) <= 0.97: # take only 3% of images
             return
         
         yaw = (-yaw - 90 + 180)%360-180
@@ -1231,9 +1328,9 @@ class FixMeasurement(EstimateMeasurementCovariance):
         self.points = [[2, 2], [2, -2], [-2, -2], [-2, 2]]
 
     def random_point(self):
-        # yaw = random.uniform(-180, 180)
-        yaw = 90
-        h = 6
+        yaw = random.uniform(-180, 180)
+        # yaw = 90
+        h = 7.5
         x, y = tuple(self.points[self.p_i])
         self.p_i+=1
         self.p_i%=4

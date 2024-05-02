@@ -70,20 +70,18 @@ class gzCamera(qtc.QObject):
                 frame = cv2.polylines(frame, [pts], isClosed, color, thickness)
 
                 # Draw the pose information
-                pose = result.pose_R
+                rotation = result.pose_R
                 trans = result.pose_t
 
                 tag_size = self.tag_sizes[result.tag_id]
-                yaw = np.degrees(np.arctan2(pose[1, 0], pose[0, 0]))
+                yaw = np.degrees(np.arctan2(rotation[1, 0], rotation[0, 0]))
                 yaw = (yaw + 180)%360-180
 
-                dx, dy = self.rotate_point(0.5, -0.5, yaw)
-                ox, oy = self.rotate_point(self.cam_cfg["x_offset"], self.cam_cfg["y_offset"], yaw)
+                # ox, oy = self.rotate_point(self.cam_cfg["x_offset"]*1000, self.cam_cfg["y_offset"]*1000, yaw)
+                ox,oy = 0,0
 
-                x = (trans[0][0] + dx)*tag_size - ox
-                y = (trans[1][0] + dy)*tag_size - oy
-                # x = (trans[0][0])*tag_size
-                # y = (trans[1][0])*tag_size
+                x = trans[0][0]*tag_size - ox
+                y = trans[1][0]*tag_size - oy
                 z = trans[2][0]*tag_size
                 
                 frame = cv2.putText(frame, f"X: {x:.2f}, Y: {y:.2f}, Z: {z:.2f}", (pts[0][0][0], pts[0][0][1] - 10),
