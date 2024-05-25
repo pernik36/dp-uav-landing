@@ -3,6 +3,8 @@ base_world_path: ./GUI/base.sdf
 px4_bin_path: "/home/vojta/PX4/PX4-Autopilot/build/px4_sitl_default/bin/px4"
 gz_model: x500_cam
 px4_sys_autostart: '4001'
+restart_after_experiments: 1
+headless: True
 camera:
   fx: 614.1182502063649
   fy: 614.2811984891936
@@ -16,7 +18,7 @@ camera:
 sun_direction: [-0.5, 0.1, -0.7]
 uav_h: 10
 max_steps_wo_visual: 50
-landing_trigger_alt: 0.5
+landing_trigger_alt: 0.60
 uav_max_v: 1.5 # m/s
 exclude_mission_columns_in_experiment_table: ["plosina.stin_sklon", "plosina.phi", "vitr.s_phi", "vitr.s_v", "uav.phi"]
 experiments_file: GUI/experimenty.yaml

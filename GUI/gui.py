@@ -3,6 +3,7 @@ import os
 import signal
 import subprocess
 import sys
+import time
 from types import NoneType
 from typing import Optional
 from PySide6 import QtCore as qtc
@@ -11,6 +12,7 @@ from PySide6 import QtGui as qtg
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QWidget
 import numpy as np
+import pyqtgraph as pg
 import psutil
 
 from qasync import QEventLoop, QApplication, asyncClose, asyncSlot
@@ -73,6 +75,17 @@ class Missions(qtw.QMainWindow):
         self.mise_target_label_updater = PositionUpdater(self.ui.label_tag, self.ui.pl_x, self.ui.pl_y, self.ui.pl_phi)
         self.setup_states()
         self.setup_signals_slots()
+        self.resume()
+
+    def resume(self):
+        try:
+            with open("GUI/pokracovani.yaml", "r") as file:
+                resume = yaml.load(file, Loader=yaml.SafeLoader)
+                self.ui.textBox_nazev_experimentu.setPlainText(resume["nazev"])
+                self.load_experiment()
+                self.run_stop_experiment(resume["index"], resume["N"])
+        except FileNotFoundError:
+            print("Resume file not found.")    
 
     def load_config(self):
         try:
@@ -132,10 +145,38 @@ class Missions(qtw.QMainWindow):
         self.ui.label_cam.setScaledContents(True)
         # self.alg = self.algs.list[self.ui.comboBox_alg.currentIndex()]
 
+        self.setup_plots()
+
         self.ui.table_experiment.setModel(self.current_experiment)
         for i, c in enumerate(self.current_experiment.columns):
             if c in self.cfg["exclude_mission_columns_in_experiment_table"]:
                 self.ui.table_experiment.setColumnHidden(i, True)
+
+    def setup_plots(self):
+        self.lines = []
+        labelY=["Chyba x [m]", "Chyba y [m]", "Chyba yaw [°]"]
+        nazvy=["Chyba x", "Chyba y", "Chyba yaw"]
+        plots = []
+        for i in range(3):
+            pl = self.ui.grafChyby.addPlot(row=0, col=i)
+            plots.append(pl)
+            self.ui.grafChyby.setBackground((45,45,45))
+            pen = pg.mkPen(color=(255, 110, 0), width=2)
+            styles = {"color": "white", "font-size": "18px"}
+            pl.setLabel("left", labelY[i], **styles)
+            pl.setLabel("bottom", "Čas [s]", **styles)
+            # pl.addLegend()
+            pl.showGrid(x=True, y=True)
+            # Get a line reference
+            self.lines.append(pl.plot(
+                [0,1],[0,1],
+                name=nazvy[i],
+                pen=pen
+            ))
+        plots[1].setXLink(plots[0])
+        plots[2].setXLink(plots[0])
+        self.plotData=[[],[],[]]
+        self.plotTimes=[]
 
     def add_mission_to_experiment(self):
         for index in self.ui.list_mise_2.selectedIndexes():
@@ -154,6 +195,18 @@ class Missions(qtw.QMainWindow):
     def on_algChange(self, index):
         self.run_alg_relay_signal.disconnect()
         self.run_alg_relay_signal.connect(self.algs.list[index].run)
+
+    def on_algStep(self, message):
+        self.ui.plainTextEdit.setPlainText(message)
+
+    def on_trajectoryError(self, err, time):
+        self.plotTimes.append(time)
+        for i in range(3):
+            self.plotData[i].append(err[i])
+
+    def updatePlots(self):
+        for i in range(3):
+            self.lines[i].setData(self.plotTimes, self.plotData[i])
 
     def save_mission(self):
         nazev = self.ui.textBox_nazev_mise.toPlainText()
@@ -291,6 +344,7 @@ class Missions(qtw.QMainWindow):
         self.ui.comboBox_alg.setEnabled(True)
         self.ui.tabWidget.setCurrentIndex(0)
         self.ui.tabWidget.setTabEnabled(1, False)
+        self.ui.plainTextEdit.setPlainText("-")
 
     def experiment_stopped(self):
         self.ui.label_exp_i.setText("-")
@@ -305,12 +359,14 @@ class Missions(qtw.QMainWindow):
             'PX4_SYS_AUTOSTART': self.cfg["px4_sys_autostart"],
             'PX4_GZ_MODEL': self.cfg["gz_model"],
             'PX4_GZ_WORLD': self.ui.textBox_nazev_mise.toPlainText(),
-            'PX4_GZ_MODEL_POSE': " ".join((str(self.ui.uav_x.value()), str(self.ui.uav_y.value()), "0.25", "0", "0", str(self.ui.uav_phi.value()))),
+            'PX4_GZ_MODEL_POSE': " ".join((str(self.ui.uav_x.value()), str(self.ui.uav_y.value()), "0", "0", "0", str(self.ui.uav_phi.value()))),
             'PX4_HOME_LAT': str(self.cfg["origin"]["lat_deg"]),
             'PX4_HOME_LON': str(self.cfg["origin"]["lon_deg"]),
             'PX4_HOME_ALT': str(self.cfg["origin"]["elevation"])
-            #,'HEADLESS': str(self.cfg["headless"])
         }
+
+        if self.cfg["headless"]:
+            env_vars["HEADLESS"] = str(1)
 
         self.update_sdf_with_mission(self.ui.textBox_nazev_mise.toPlainText()+".sdf")
 
@@ -325,16 +381,35 @@ class Missions(qtw.QMainWindow):
         os.environ.clear()
         os.environ.update(original_env)
 
-        qtc.QTimer.singleShot(15000, self.run_alg_relay_slot)
         self.ui.comboBox_alg.setEnabled(False)
 
         self.camera = gzCamera(self, self.cfg)
         self.camera.new_frame.connect(self.updateCameraFrame)
+        self.camera.new_frame.connect(self.run_alg_relay_slot)
 
         self.ui.tabWidget.setTabEnabled(1, True)
         self.ui.tabWidget.setCurrentIndex(1)
 
-    def run_alg_relay_slot(self):
+        try:
+            self.algs.list[self.ui.comboBox_alg.currentIndex()].step_signal.connect(self.on_algStep)
+        except AttributeError: # doesnt have step signal
+            pass
+
+        try:
+            self.algs.list[self.ui.comboBox_alg.currentIndex()].ae_signal.connect(self.on_trajectoryError)
+        except AttributeError: # doesnt have trajectory error signal
+            pass
+        
+        self.plotTimes = []
+        self.plotData = [[],[],[]]
+        self.updatePlots()
+        self.stepTimer = qtc.QTimer()
+        self.stepTimer.timeout.connect(self.updatePlots)
+        self.stepTimer.start(5000)
+
+    def run_alg_relay_slot(self, x, y, z, yaw, t, frame, step_start):
+        self.camera.new_frame.disconnect(self.run_alg_relay_slot)
+        time.sleep(2)
         uav_pl_rel_x = self.ui.pl_x.value() - self.ui.uav_x.value()
         uav_pl_rel_y = self.ui.pl_y.value() - self.ui.uav_y.value()
         self.run_alg_relay_signal.emit(self.tabMise_mission_dict(), uav_pl_rel_x, uav_pl_rel_y, self.camera)
@@ -358,12 +433,12 @@ class Missions(qtw.QMainWindow):
     def current_experiment_name(self):
         return self.ui.textBox_nazev_experimentu.toPlainText()
 
-    def run_stop_experiment(self):
+    def run_stop_experiment(self, i=0, N=0):
         if not self.experiment_runner.running:
             if self.px4 is not None:
                 return
             self.ui.but_start_experiment.setText("■ Stop")
-            self.experiment_runner.run(self.current_experiment, self.current_experiment_name())
+            self.experiment_runner.run(self.current_experiment, self.current_experiment_name(), i, N)
             return
         if self.px4 is not None:
             self.run_stop_mission()
@@ -378,9 +453,9 @@ class Missions(qtw.QMainWindow):
 
         include = root.find(".//include")           # umisteni tagu
         pose_element = include.find("pose")
-        pose_x = mission['plosina']['x'] - mission["plosina"]["a"]/200.0
-        pose_y = mission['plosina']['y']
-        pose_yaw = mission['plosina']['phi']
+        pose_yaw = -math.radians(mission['plosina']['phi'])
+        pose_x = mission['plosina']['x'] - math.cos(pose_yaw) * mission["plosina"]["a"]/200.0
+        pose_y = mission['plosina']['y'] - math.sin(pose_yaw) * mission["plosina"]["a"]/200.0
         pose_values = f"{pose_x} {pose_y} 0 0 1.57 {pose_yaw}"
         pose_element.text = pose_values
 
@@ -440,8 +515,8 @@ class Missions(qtw.QMainWindow):
     async def onMyEvent(self):
         pass
 
-    @qtc.Slot(object, object, object, object, float, qtg.QImage)
-    def updateCameraFrame(self, x, y, z, yaw, t, frame):
+    @qtc.Slot(object, object, object, object, float, qtg.QImage, float)
+    def updateCameraFrame(self, x, y, z, yaw, t, frame, step_start):
         self.ui.label_cam.setPixmap(qtg.QPixmap(frame))
     
 class MissionsModel(qtc.QAbstractListModel):
@@ -673,6 +748,9 @@ class ExperimentsModel(qtc.QAbstractListModel):
         
 
 if __name__ == "__main__":
+    for proc in psutil.process_iter():
+        if "ruby" in proc.name() or "px4" in proc.name():
+            proc.send_signal(signal.SIGKILL)
     app = QApplication(sys.argv)
 
     event_loop = QEventLoop(app)

@@ -21,11 +21,15 @@ from PySide6.QtWidgets import (QAbstractItemView, QAbstractSpinBox, QApplication
     QMenuBar, QPlainTextEdit, QPushButton, QSizePolicy,
     QStatusBar, QTabWidget, QTableView, QWidget)
 
+from pyqtgraph import GraphicsLayoutWidget
+
 class Ui_MainWindow(object):
     def setupUi(self, MainWindow):
         if not MainWindow.objectName():
             MainWindow.setObjectName(u"MainWindow")
         MainWindow.resize(1166, 603)
+        icon = QIcon(QIcon.fromTheme(u"applications-games"))
+        MainWindow.setWindowIcon(icon)
         self.centralwidget = QWidget(MainWindow)
         self.centralwidget.setObjectName(u"centralwidget")
         self.tabWidget = QTabWidget(self.centralwidget)
@@ -95,7 +99,7 @@ class Ui_MainWindow(object):
         self.pl_y.setValue(-11.199999999999999)
         self.pl_phi = QDoubleSpinBox(self.groupBox)
         self.pl_phi.setObjectName(u"pl_phi")
-        self.pl_phi.setEnabled(False)
+        self.pl_phi.setEnabled(True)
         self.pl_phi.setGeometry(QRect(250, 29, 71, 26))
         self.pl_phi.setWrapping(True)
         self.pl_phi.setProperty("showGroupSeparator", False)
@@ -107,7 +111,7 @@ class Ui_MainWindow(object):
         self.pl_phi.setValue(0.000000000000000)
         self.label_3 = QLabel(self.groupBox)
         self.label_3.setObjectName(u"label_3")
-        self.label_3.setEnabled(False)
+        self.label_3.setEnabled(True)
         self.label_3.setGeometry(QRect(230, 30, 21, 20))
         self.label_3.setAlignment(Qt.AlignBottom|Qt.AlignLeading|Qt.AlignLeft)
         self.groupBox_2 = QGroupBox(self.tab_mise)
@@ -145,7 +149,7 @@ class Ui_MainWindow(object):
         self.uav_y.setValue(3.000000000000000)
         self.uav_phi = QDoubleSpinBox(self.groupBox_2)
         self.uav_phi.setObjectName(u"uav_phi")
-        self.uav_phi.setEnabled(False)
+        self.uav_phi.setEnabled(True)
         self.uav_phi.setGeometry(QRect(250, 29, 71, 26))
         self.uav_phi.setWrapping(True)
         self.uav_phi.setProperty("showGroupSeparator", False)
@@ -157,7 +161,7 @@ class Ui_MainWindow(object):
         self.uav_phi.setValue(0.000000000000000)
         self.label_6 = QLabel(self.groupBox_2)
         self.label_6.setObjectName(u"label_6")
-        self.label_6.setEnabled(False)
+        self.label_6.setEnabled(True)
         self.label_6.setGeometry(QRect(230, 30, 21, 20))
         self.label_6.setAlignment(Qt.AlignBottom|Qt.AlignLeading|Qt.AlignLeft)
         self.groupBox_3 = QGroupBox(self.tab_mise)
@@ -228,6 +232,7 @@ class Ui_MainWindow(object):
         self.groupBox_4.setGeometry(QRect(400, 280, 331, 101))
         self.pl_a = QDoubleSpinBox(self.groupBox_4)
         self.pl_a.setObjectName(u"pl_a")
+        self.pl_a.setEnabled(False)
         self.pl_a.setGeometry(QRect(70, 30, 81, 26))
         self.pl_a.setWrapping(True)
         self.pl_a.setProperty("showGroupSeparator", False)
@@ -239,6 +244,7 @@ class Ui_MainWindow(object):
         self.pl_a.setValue(70.000000000000000)
         self.label_11 = QLabel(self.groupBox_4)
         self.label_11.setObjectName(u"label_11")
+        self.label_11.setEnabled(False)
         self.label_11.setGeometry(QRect(10, 31, 51, 20))
         self.label_11.setAlignment(Qt.AlignBottom|Qt.AlignRight|Qt.AlignTrailing)
         self.label_12 = QLabel(self.groupBox_4)
@@ -295,10 +301,6 @@ class Ui_MainWindow(object):
         self.but_start = QPushButton(self.tab_mise)
         self.but_start.setObjectName(u"but_start")
         self.but_start.setGeometry(QRect(750, 60, 71, 25))
-        self.label_15 = QLabel(self.tab_mise)
-        self.label_15.setObjectName(u"label_15")
-        self.label_15.setGeometry(QRect(650, 190, 81, 81))
-        self.label_15.setAlignment(Qt.AlignCenter)
         self.comboBox_alg = QComboBox(self.tab_mise)
         self.comboBox_alg.addItem("")
         self.comboBox_alg.setObjectName(u"comboBox_alg")
@@ -328,6 +330,14 @@ class Ui_MainWindow(object):
         self.label_exp_N = QLabel(self.tab_zive)
         self.label_exp_N.setObjectName(u"label_exp_N")
         self.label_exp_N.setGeometry(QRect(520, 30, 51, 17))
+        self.plainTextEdit = QPlainTextEdit(self.tab_zive)
+        self.plainTextEdit.setObjectName(u"plainTextEdit")
+        self.plainTextEdit.setGeometry(QRect(590, 10, 291, 241))
+        self.plainTextEdit.setUndoRedoEnabled(False)
+        self.plainTextEdit.setReadOnly(True)
+        self.grafChyby = GraphicsLayoutWidget(self.tab_zive)
+        self.grafChyby.setObjectName(u"grafChyby")
+        self.grafChyby.setGeometry(QRect(10, 260, 1141, 261))
         self.tabWidget.addTab(self.tab_zive, "")
         self.tab_experiment = QWidget()
         self.tab_experiment.setObjectName(u"tab_experiment")
@@ -465,7 +475,7 @@ class Ui_MainWindow(object):
     # setupUi
 
     def retranslateUi(self, MainWindow):
-        MainWindow.setWindowTitle(QCoreApplication.translate("MainWindow", u"MainWindow", None))
+        MainWindow.setWindowTitle(QCoreApplication.translate("MainWindow", u"Syst\u00e9m pro simulaci p\u0159ist\u00e1v\u00e1n\u00ed", None))
 #if QT_CONFIG(accessibility)
         self.mapa.setAccessibleName(QCoreApplication.translate("MainWindow", u"Mapa", None))
 #endif // QT_CONFIG(accessibility)
@@ -588,7 +598,6 @@ class Ui_MainWindow(object):
         self.but_load.setText(QCoreApplication.translate("MainWindow", u"Na\u010d\u00edst", None))
         self.but_delete.setText(QCoreApplication.translate("MainWindow", u"Odstranit", None))
         self.but_start.setText(QCoreApplication.translate("MainWindow", u"\u25b6 Start", None))
-        self.label_15.setText(QCoreApplication.translate("MainWindow", u"Preview", None))
         self.comboBox_alg.setItemText(0, QCoreApplication.translate("MainWindow", u"Z\u00e1kladn\u00ed", None))
 
         self.label_16.setText(QCoreApplication.translate("MainWindow", u"Algoritmus:", None))

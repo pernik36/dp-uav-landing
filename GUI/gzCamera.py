@@ -13,7 +13,7 @@ import cv2
 
 
 class gzCamera(qtc.QObject):
-    new_frame = qtc.Signal(object, object, object, object, float, qtg.QImage) # x, y, z, yaw, time, frame
+    new_frame = qtc.Signal(object, object, object, object, float, qtg.QImage, float) # x, y, z, yaw, time, frame, RT step start
     def __init__(self, parent: qtc.QObject | None = ..., cfg: dict|None=...) -> None:
         super().__init__(parent)
 
@@ -114,6 +114,7 @@ class gzCamera(qtc.QObject):
         return rotated_x, rotated_y
 
     def cb(self, msg: Image) -> None:
+        step_start = time.perf_counter()
         if self.cb_running: # drop current frame if the previous is not processed yet
             return
         self.cb_running = True
@@ -121,13 +122,17 @@ class gzCamera(qtc.QObject):
         frame = np.frombuffer(msg.data, dtype=np.uint8).reshape((msg.height, msg.width, 3))
 
         # Detect AprilTags in the frame with pose estimation
-        frame_with_tags, x, y, z, yaw = self.detect_apriltags(frame)
+        try:
+            frame_with_tags, x, y, z, yaw = self.detect_apriltags(frame)
+        except Exception:
+            self.cb_running = False
+            return
         t = msg.header.stamp.sec + msg.header.stamp.nsec/1000000000.0
 
         bytes_per_line = 3*frame_with_tags.shape[1]
         Qframe = qtg.QImage(frame_with_tags.data, frame_with_tags.shape[1], frame_with_tags.shape[0], bytes_per_line, qtg.QImage.Format_BGR888)
 
-        self.new_frame.emit(x, y, z, yaw, t, Qframe)
+        self.new_frame.emit(x, y, z, yaw, t, Qframe, step_start)
 
         self.cb_running = False
 
@@ -140,4 +145,5 @@ class gzCamera(qtc.QObject):
         self.node.unsubscribe(self.info_topic)
 
     def stop(self):
+        time.sleep(0.5)
         del self.detector
